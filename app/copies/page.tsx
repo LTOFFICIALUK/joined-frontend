@@ -6,6 +6,22 @@ import { useSession } from "@/app/providers"
 import { api, type JoinRow } from "@/lib/api"
 import { shortAddr, signedUsd, sz, usd } from "@/lib/format"
 
+const actionWord = (value: string) => {
+  if (value === "open") return "Opened"
+  if (value === "add") return "Added"
+  if (value === "reduce") return "Reduced"
+  if (value === "close") return "Closed"
+  return "Updated"
+}
+
+const actionLine = (action: JoinRow["actions"][number]) => {
+  const name = action.coin.split(":").pop() || action.coin
+  const word = actionWord(action.traderAction)
+  if (action.status === "placed") return `${word} ${name}.`
+  if (action.status === "skipped") return `${word} ${name}. Waiting until the copy reaches $10.`
+  return `${word} ${name}. ${action.detail}`
+}
+
 export default function CopiesPage() {
   const { session, ready, connect } = useSession()
   const [rows, setRows] = useState<JoinRow[] | null>(null)
@@ -107,6 +123,13 @@ export default function CopiesPage() {
             ) : (
               <p className="mt-4 text-sm text-muted">Copied positions show up here after this trader opens, adds, reduces, or closes a stock perp.</p>
             )}
+            {row.actions.length ? (
+              <ul className="mt-3 space-y-1">
+                {row.actions.map((action) => (
+                  <li key={action.id} className="text-sm text-muted">{actionLine(action)}</li>
+                ))}
+              </ul>
+            ) : null}
           </article>
         ))}
       </div>
