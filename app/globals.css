@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --ink: #04211c;
+  --text: #f2f2f0;
+  --muted: #9b9b97;
+  --line: #222222;
+  --teal: #50d2c1;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  min-height: 100%;
+  background: #000;
+  color: #f2f2f0;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+button, input { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 2px solid #50d2c1;
+  outline-offset: 3px;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #222; border-radius: 99px; }
