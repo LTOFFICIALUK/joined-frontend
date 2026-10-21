@@ -12,7 +12,7 @@ const presets = [100, 250, 500, 1000]
 export default function TraderPage() {
   const params = useParams<{ address: string }>()
   const address = params.address
-  const { session, connect } = useSession()
+  const { session, connect, hint } = useSession()
   const [trader, setTrader] = useState<Trader | null>(null)
   const [fills, setFills] = useState<TraderFill[]>([])
   const [error, setError] = useState("")
@@ -153,7 +153,7 @@ export default function TraderPage() {
         >
           {busy ? "Joining" : "Join with Phantom"}
         </button>
-        {note ? <p className="mt-3 text-sm text-paper">{note}</p> : null}
+        {note || hint ? <p className="mt-3 text-sm text-paper">{note || hint}</p> : null}
       </aside>
     </section>
   )
