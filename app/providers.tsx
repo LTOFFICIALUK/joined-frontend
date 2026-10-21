@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import { api, clearToken, getToken, setToken, toB64 } from "@/lib/api"
 import { getPhantom, phantomError, pubkeyOf, readSignature, waitForPhantom } from "@/lib/phantom"
+import { useStream } from "@/lib/stream"
 
 type Session = { pubkey: string; evm: string }
 
@@ -24,6 +25,7 @@ export const useSession = () => {
 }
 
 export const Providers = ({ children }: { children: React.ReactNode }) => {
+  useStream()
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)

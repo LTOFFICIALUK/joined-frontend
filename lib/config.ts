@@ -19,3 +19,7 @@ export const BRAND = {
 export const apiUrl =
   fromEnv(process.env.NEXT_PUBLIC_API_URL) ||
   (process.env.NODE_ENV === "development" ? "http://localhost:8080" : "")
+
+export const wsUrl =
+  fromEnv(process.env.NEXT_PUBLIC_WS_URL) ||
+  (apiUrl ? `${apiUrl.replace(/^http/, "ws")}/stream` : "")
