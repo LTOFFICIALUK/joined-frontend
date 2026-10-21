@@ -18,7 +18,7 @@ export const Footer = () => {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
         {BRAND.x ? (
           <a href={BRAND.x} className="font-display text-sm font-bold text-paper" target="_blank" rel="noreferrer">
-            X
+            {BRAND.xHandle}
           </a>
         ) : (
           <span className="font-display text-sm font-bold text-muted">X Pending</span>

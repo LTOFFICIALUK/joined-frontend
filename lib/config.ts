@@ -10,9 +10,10 @@ export const BRAND = {
   url: "https://joined.fun",
   tagline: "One trader. Everyone joins in.",
   description: "Pick a top stock trader on Hyperliquid. Join, and your Phantom wallet follows every trade they make.",
-  x: "",
+  x: "https://x.com/joinedfun_",
+  xHandle: "@joinedfun_",
   ticker: "$JOINED",
-  ca: "",
+  ca: "DNxb5BhASLe3rgrycDcrsFhEzFwfbFmo6aAjGbJoiNED",
 }
 
 export const apiUrl =
