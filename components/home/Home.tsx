@@ -5,8 +5,15 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react"
 import { BootScreen } from "@/components/brand/BootScreen"
 import { HomeBoard } from "@/components/home/HomeBoard"
 import { hasPlayedBoot, markBootPlayed, readBoard } from "@/lib/boardCache"
+import type { TapePrint, Trader } from "@/lib/api"
 
-export const Home = () => {
+export const Home = ({
+  initialTraders,
+  initialTape,
+}: {
+  initialTraders: Trader[] | null
+  initialTape: TapePrint[] | null
+}) => {
   const [cover, setCover] = useState(true)
   const [revealed, setRevealed] = useState(false)
   const [ready, setReady] = useState(false)
@@ -63,7 +70,7 @@ export const Home = () => {
             </li>
           ))}
         </ol>
-        <HomeBoard orbitRef={setOrbit} showBubbles={!cover} onReady={handleReady} />
+        <HomeBoard orbitRef={setOrbit} showBubbles={!cover} onReady={handleReady} initialTraders={initialTraders} initialTape={initialTape} />
       </section>
     </>
   )

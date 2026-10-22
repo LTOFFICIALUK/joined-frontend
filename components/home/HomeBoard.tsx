@@ -7,7 +7,7 @@ import { Avatar } from "@/components/traders/Avatar"
 import { ApiDown } from "@/components/brand/Skeleton"
 import { TickerLink } from "@/components/markets/TickerLink"
 import { api, type TapePrint, type Trader } from "@/lib/api"
-import { readBoard, writeBoard } from "@/lib/boardCache"
+import { writeBoard } from "@/lib/boardCache"
 import { compactUsd, shortAddr, signedUsd, when } from "@/lib/format"
 import { groupPrints, nicknameFor, printBits, riskOf, withNames } from "@/lib/traderStyle"
 
@@ -77,26 +77,30 @@ export const HomeBoard = ({
   orbitRef,
   showBubbles,
   onReady,
+  initialTraders,
+  initialTape,
 }: {
   orbitRef: (node: HTMLDivElement | null) => void
   showBubbles: boolean
   onReady: () => void
+  initialTraders: Trader[] | null
+  initialTape: TapePrint[] | null
 }) => {
-  const [traders, setTraders] = useState<Trader[] | null>(null)
-  const [tape, setTape] = useState<TapePrint[] | null>(null)
-  const [error, setError] = useState("")
+  const seeded = initialTraders ? withNames(initialTraders) : null
+  const [traders, setTraders] = useState<Trader[] | null>(seeded)
+  const [tape, setTape] = useState<TapePrint[] | null>(initialTape)
+  const [error, setError] = useState(initialTraders ? "" : "Could not reach joined.fun")
   const [attempt, setAttempt] = useState(0)
-  const held = useRef<{ traders: Trader[]; tape: TapePrint[] }>({ traders: [], tape: [] })
+  const held = useRef<{ traders: Trader[]; tape: TapePrint[] }>({ traders: seeded ?? [], tape: initialTape ?? [] })
 
   useEffect(() => {
+    if (seeded?.length) writeBoard(seeded)
+    onReady()
+  }, [])
+
+  useEffect(() => {
+    if (attempt === 0) return
     let stop = false
-    const cached = readBoard()
-    if (cached?.length) {
-      const named = withNames(cached)
-      held.current.traders = named
-      setTraders(named)
-      onReady()
-    }
     const load = async () => {
       try {
         const data = await api.traders()
@@ -127,13 +131,8 @@ export const HomeBoard = ({
     }
     void load()
     void loadTape()
-    const timer = window.setInterval(() => {
-      void load()
-      void loadTape()
-    }, 15000)
     return () => {
       stop = true
-      window.clearInterval(timer)
     }
   }, [onReady, attempt])
 
