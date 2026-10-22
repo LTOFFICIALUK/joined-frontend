@@ -7,6 +7,7 @@ import { Hold } from "@/components/brand/Hold"
 import { EmptyGuide } from "@/components/shell/EmptyGuide"
 import { api, type JoinRow } from "@/lib/api"
 import { shortAddr, signedUsd, sz, usd } from "@/lib/format"
+import { useEmbedded } from "@/lib/embed"
 
 const actionWord = (value: string) => {
   if (value === "open") return "Opened"
@@ -25,6 +26,7 @@ const actionLine = (action: JoinRow["actions"][number]) => {
 }
 
 export default function CopiesPage() {
+  const embedded = useEmbedded()
   const { session, ready, connect } = useSession()
   const [rows, setRows] = useState<JoinRow[] | null>(null)
   const [error, setError] = useState("")
@@ -82,16 +84,16 @@ export default function CopiesPage() {
 
   return (
     <section>
-      <h1 className="font-display text-4xl font-extrabold">My copies</h1>
+      {embedded ? <h2 className="font-display text-2xl font-bold">Copies</h2> : <h1 className="font-display text-4xl font-extrabold">My copies</h1>}
       <p className="mt-2 max-w-xl text-sm text-muted">Active joins and the positions copied onto your Hyperliquid account.</p>
-      {!session && ready ? (
+      {!embedded && !session && ready ? (
         <EmptyGuide
           title="Nothing copied yet"
           body="This page lists every trader you join, the stock positions copied onto your account, and each action as it happens."
           steps={[
             "Connect Phantom. You sign a login message. It does not send funds.",
             "Pick a trader and a size. Copying starts from the next stock trade.",
-            "Deposit SOL on Funds so those copies have USDC to trade.",
+            "Send SOL from the join button if the account is empty. It lands as USDC.",
           ]}
           action={(
             <>
@@ -121,7 +123,7 @@ export default function CopiesPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <Link href={`/traders/${row.trader}`} className="font-mono text-sm">{shortAddr(row.trader)}</Link>
-                <p className="mt-1 text-xs text-muted">Size ${usd(row.sizeUsd)}{row.traderPnl7d === null ? "" : `, trader 7 day ${signedUsd(row.traderPnl7d)}`}</p>
+                <p className="mt-1 text-xs text-muted">Size ${usd(row.sizeUsd)}{row.maxLeverage ? `, cap ${row.maxLeverage}x` : ""}{row.traderPnl7d === null ? "" : `, trader 7 day ${signedUsd(row.traderPnl7d)}`}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={busy === row.id} onClick={() => void handleStop(row.id)} className="rounded-full border border-line px-3 py-2 font-display text-xs font-bold">Stop</button>

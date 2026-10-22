@@ -3,17 +3,20 @@
 import Link from "next/link"
 import { useEffect, useLayoutEffect, useMemo, useState } from "react"
 import { Hold } from "@/components/brand/Hold"
+import { Avatar } from "@/components/traders/Avatar"
 import { PnlLine } from "@/components/traders/PnlLine"
 import { api, type Trader } from "@/lib/api"
 import { readBoard, writeBoard } from "@/lib/boardCache"
-import { shortAddr, signedUsd, sz, usd } from "@/lib/format"
+import { compactUsd, signedUsd, usd } from "@/lib/format"
+import { copyScore, leadPosition, marketNote, maxLeverageOf, monthStats, nicknameFor, positionBrief, riskOf } from "@/lib/traderStyle"
 
-type SortKey = "pnl7d" | "pnl30d" | "accountValue"
+type SortKey = "score" | "pnl30d" | "pnl7d" | "accountValue"
 type SideKey = "all" | "long" | "short"
 
 const sorts: Array<{ id: SortKey; label: string }> = [
-  { id: "pnl7d", label: "7 day" },
+  { id: "score", label: "Best" },
   { id: "pnl30d", label: "30 day" },
+  { id: "pnl7d", label: "7 day" },
   { id: "accountValue", label: "Account" },
 ]
 
@@ -21,6 +24,19 @@ const sides: Array<{ id: SideKey; label: string }> = [
   { id: "all", label: "All" },
   { id: "long", label: "Long" },
   { id: "short", label: "Short" },
+]
+
+const levCaps = [
+  { id: 0, label: "Any leverage" },
+  { id: 5, label: "5x and under" },
+  { id: 10, label: "10x and under" },
+  { id: 25, label: "25x and under" },
+]
+
+const accounts = [
+  { id: 0, label: "Any size" },
+  { id: 100_000, label: "$100K and up" },
+  { id: 1_000_000, label: "$1M and up" },
 ]
 
 const Chip = ({
@@ -42,16 +58,33 @@ const Chip = ({
   </button>
 )
 
+const riskClass = (risk: string) => {
+  if (risk === "High") return "text-down"
+  if (risk === "Medium") return "text-paper"
+  return "text-teal"
+}
+
 export default function TradersPage() {
   const [traders, setTraders] = useState<Trader[] | null>(null)
   const [error, setError] = useState("")
-  const [sort, setSort] = useState<SortKey>("pnl7d")
+  const [sort, setSort] = useState<SortKey>("score")
   const [side, setSide] = useState<SideKey>("all")
   const [query, setQuery] = useState("")
+  const [both, setBoth] = useState(false)
+  const [levCap, setLevCap] = useState(0)
+  const [minAccount, setMinAccount] = useState(0)
+  const [open, setOpen] = useState("")
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
 
   useLayoutEffect(() => {
     const cached = readBoard()
     if (cached) setTraders(cached)
+  }, [])
+
+  useEffect(() => {
+    const clock = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(clock)
   }, [])
 
   useEffect(() => {
@@ -62,6 +95,7 @@ export default function TradersPage() {
         if (!stop) {
           writeBoard(data.traders)
           setTraders(data.traders)
+          setFetchedAt(Date.now())
           setError("")
         }
       } catch (err) {
@@ -79,9 +113,7 @@ export default function TradersPage() {
   const stocks = useMemo(() => {
     const counts = new Map<string, number>()
     for (const trader of traders ?? []) {
-      for (const position of trader.positions) {
-        counts.set(position.label, (counts.get(position.label) ?? 0) + 1)
-      }
+      for (const position of trader.positions) counts.set(position.label, (counts.get(position.label) ?? 0) + 1)
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([label]) => label)
   }, [traders])
@@ -89,36 +121,38 @@ export default function TradersPage() {
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     const rows = (traders ?? []).filter((trader) => {
-      const walletHit = needle ? trader.address.toLowerCase().includes(needle) || (trader.displayName ?? "").toLowerCase().includes(needle) : false
+      const walletHit = needle ? trader.address.toLowerCase().includes(needle) || nicknameFor(trader).toLowerCase().includes(needle) : false
       const named = needle ? trader.positions.filter((position) => position.label.toLowerCase().includes(needle)) : trader.positions
       if (needle && !walletHit && !named.length) return false
+      if (both && !(trader.pnl7d > 0 && trader.pnl30d > 0)) return false
+      if (minAccount && trader.accountValue < minAccount) return false
+      if (levCap && maxLeverageOf(trader) > levCap) return false
       if (side === "all") return true
       const pool = needle && !walletHit ? named : trader.positions
       return pool.some((position) => position.side === side)
     })
-    return [...rows].sort((a, b) => b[sort] - a[sort])
-  }, [traders, sort, side, query])
+    const value = (trader: Trader) => (sort === "score" ? copyScore(trader) : trader[sort])
+    return [...rows].sort((a, b) => value(b) - value(a))
+  }, [traders, sort, side, query, both, levCap, minAccount])
 
-  const filtering = sort !== "pnl7d" || side !== "all" || query.trim().length > 0
+  const filtering = sort !== "score" || side !== "all" || query.trim().length > 0 || both || levCap > 0 || minAccount > 0
+  const ago = fetchedAt === null ? null : Math.max(0, Math.round((now - fetchedAt) / 1000))
 
   const handleClear = () => {
-    setSort("pnl7d")
+    setSort("score")
     setSide("all")
     setQuery("")
+    setBoth(false)
+    setLevCap(0)
+    setMinAccount(0)
   }
 
   const handleStock = (label: string) => {
     setQuery((current) => (current.trim().toUpperCase() === label ? "" : label))
   }
 
-  const preview = (trader: Trader) => {
-    const needle = query.trim().toLowerCase()
-    const rank = (position: Trader["positions"][number]) => {
-      const named = needle && position.label.toLowerCase().includes(needle) ? 2 : 0
-      const sided = side !== "all" && position.side === side ? 1 : 0
-      return named + sided
-    }
-    return [...trader.positions].sort((a, b) => rank(b) - rank(a) || b.positionValue - a.positionValue).slice(0, 2)
+  const handleToggle = (address: string) => {
+    setOpen((current) => (current === address ? "" : address))
   }
 
   return (
@@ -126,16 +160,20 @@ export default function TradersPage() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-4xl font-extrabold">Traders</h1>
-          <p className="mt-2 max-w-xl text-sm text-muted">Top Hyperliquid wallets with open stock perps. 7 day and 30 day P&L update live.</p>
+          <p className="mt-2 max-w-xl text-sm text-muted">Ranked by 30 day P&L, how often the month went up, and the biggest drop. 30 day is the number on the row.</p>
         </div>
-        <span className="mb-1 inline-flex items-center gap-2 text-xs text-muted">
-          <span className="h-2.5 w-2.5 rounded-full bg-teal shadow-[0_0_12px_rgba(80,210,193,0.9)]" />
-          Live
-        </span>
+        <div className="mb-1 text-right text-xs text-muted">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-teal shadow-[0_0_12px_rgba(80,210,193,0.9)]" />
+            Live
+          </span>
+          <p className="mt-1">{ago === null ? "Updating" : `Updated ${ago}s ago`}</p>
+        </div>
       </div>
+      <p className="mt-3 text-xs text-muted">{marketNote(new Date(now))}</p>
       {error ? <p className="mt-6 text-sm text-down">{error}</p> : null}
       {traders && !traders.length && !error ? (
-        <p className="mt-8 rounded-card border border-line p-6 text-sm leading-relaxed text-muted">No open stock positions on the leaderboard right now. When a top wallet has an open Hyperliquid stock perp, it shows up here with 7 day P&L, 30 day P&L, and a Join button.</p>
+        <p className="mt-8 rounded-card border border-line p-6 text-sm leading-relaxed text-muted">No open stock positions on the leaderboard right now. When a top wallet has an open Hyperliquid stock perp, it shows up here with 30 day P&L and a Join button.</p>
       ) : null}
       {traders === null && !error ? <Hold /> : null}
       {traders && traders.length ? (
@@ -150,6 +188,19 @@ export default function TradersPage() {
             <p className="w-full text-xs text-muted sm:w-auto">Side</p>
             {sides.map((item) => (
               <Chip key={item.id} pressed={side === item.id} label={item.label} onClick={() => setSide(item.id)} />
+            ))}
+            <Chip pressed={both} label="Up this week and this month" onClick={() => setBoth((current) => !current)} />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <p className="w-full text-xs text-muted sm:w-auto">Max leverage</p>
+            {levCaps.map((item) => (
+              <Chip key={item.id} pressed={levCap === item.id} label={item.label} onClick={() => setLevCap(item.id)} />
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <p className="w-full text-xs text-muted sm:w-auto">Minimum account</p>
+            {accounts.map((item) => (
+              <Chip key={item.id} pressed={minAccount === item.id} label={item.label} onClick={() => setMinAccount(item.id)} />
             ))}
           </div>
           <label className="mt-4 block text-xs text-muted" htmlFor="trader-search">Search a stock or a wallet</label>
@@ -170,9 +221,7 @@ export default function TradersPage() {
           <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted">
             <p>{filtering ? `${visible.length} of ${traders.length} traders` : `${traders.length} traders`}</p>
             {filtering ? (
-              <button type="button" onClick={handleClear} className="font-display text-xs font-bold text-teal">
-                Clear filters
-              </button>
+              <button type="button" onClick={handleClear} className="font-display text-xs font-bold text-teal">Clear filters</button>
             ) : null}
           </div>
         </div>
@@ -180,47 +229,73 @@ export default function TradersPage() {
       {traders && traders.length && !visible.length ? (
         <p className="mt-6 rounded-card border border-line p-6 text-sm leading-relaxed text-muted">No traders match these filters. Clear them to see the full board.</p>
       ) : null}
-      <div className={`mt-6 space-y-3 ${traders ? "motion-safe:animate-settle" : ""}`}>
-        {visible.map((trader, index) => (
-          <article key={trader.address} className="rounded-card border border-line p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-mono text-sm">{shortAddr(trader.address)}</p>
-                <p className="mt-1 text-xs text-muted">#{index + 1}, account ${usd(trader.accountValue)}, {trader.positions.length} open{trader.joined > 0 ? `, ${trader.joined} joined` : ""}</p>
-              </div>
-              <Link href={`/traders/${trader.address}`} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">
-                Join
-              </Link>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div>
-                <p className={`font-display text-2xl font-extrabold ${trader.pnl7d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl7d)}</p>
-                <p className="text-xs text-muted">7 day P&L</p>
-              </div>
-              <div>
-                <p className={`font-display text-2xl font-extrabold ${trader.pnl30d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl30d)}</p>
-                <p className="text-xs text-muted">30 day P&L</p>
-              </div>
-            </div>
-            <div className="mt-4">
-              <PnlLine points={trader.pnl30Series} />
-            </div>
-            <ul className="mt-4 space-y-2">
-              {preview(trader).map((position) => (
-                <li key={position.coin} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span>
-                    <span className={position.side === "long" ? "text-teal" : "text-down"}>{position.side === "long" ? "Long" : "Short"}</span>
-                    {" "}{position.label}
+      <div className="mt-4 divide-y divide-line overflow-hidden rounded-card border border-line">
+        {visible.map((trader, index) => {
+          const lead = leadPosition(trader)
+          const risk = riskOf(trader)
+          const stats = monthStats(trader.pnl30Series)
+          const win = trader.winRate ?? stats.winRate
+          const drop = trader.maxDrop ?? stats.maxDrop
+          const expanded = open === trader.address
+          return (
+            <article key={trader.address}>
+              <div className="flex items-center gap-3 px-3 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleToggle(trader.address)}
+                  aria-expanded={expanded}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <Avatar address={trader.address} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="truncate font-display text-sm font-bold">{nicknameFor(trader)}</span>
+                      <span className={`font-display text-sm font-extrabold ${trader.pnl30d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl30d)}</span>
+                    </span>
+                    <span className="mt-0.5 flex items-center justify-between gap-3 text-[11px] text-muted">
+                      <span className="truncate font-mono">{trader.address.slice(0, 6)}…{trader.address.slice(-4)}</span>
+                      <span>30 day</span>
+                    </span>
+                    <span className="mt-1 flex items-center justify-between gap-3 text-xs">
+                      <span className="truncate">
+                        <span className={`font-display font-bold ${riskClass(risk)}`}>{risk}</span>
+                        {lead ? <span className="text-muted"> · {positionBrief(lead)}</span> : null}
+                      </span>
+                      <span className="text-[11px] text-muted">#{index + 1}</span>
+                    </span>
                   </span>
-                  <span className="font-mono text-xs text-muted">{sz(position.size)}, {position.leverage}x, ${usd(position.positionValue)}</span>
-                </li>
-              ))}
-              {trader.positions.length > 2 ? (
-                <li className="text-xs text-muted">{trader.positions.length - 2} more positions</li>
+                </button>
+                <div className="w-14 shrink-0">
+                  <PnlLine points={trader.pnl30Series} bare />
+                </div>
+                <Link href={`/traders/${trader.address}`} className="shrink-0 rounded-full bg-teal px-3 py-2 font-display text-xs font-bold text-ink">
+                  Join
+                </Link>
+              </div>
+              {expanded ? (
+                <div className="border-t border-line px-3 py-3 sm:pl-14">
+                  <div className="sm:hidden">
+                    <PnlLine points={trader.pnl30Series} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:mt-0">
+                    <p><span className="block text-xs text-muted">7 day P&L</span><span className={trader.pnl7d >= 0 ? "text-teal" : "text-down"}>{signedUsd(trader.pnl7d)}</span></p>
+                    <p><span className="block text-xs text-muted">Account</span>{compactUsd(trader.accountValue)}</p>
+                    <p><span className="block text-xs text-muted">Win rate</span>{Math.round(win * 100)}%</p>
+                    <p><span className="block text-xs text-muted">Biggest drop</span>{compactUsd(drop)}</p>
+                  </div>
+                  <p className="mt-2 text-xs text-muted">{trader.joined > 0 ? `${trader.joined} joined` : "Be the first to join"}</p>
+                  <ul className="mt-3 space-y-1">
+                    {trader.positions.slice(0, 5).map((position) => (
+                      <li key={position.coin} className="text-sm text-muted">{positionBrief(position)}</li>
+                    ))}
+                    {trader.positions.length > 5 ? <li className="text-xs text-muted">{trader.positions.length - 5} more positions</li> : null}
+                  </ul>
+                  <p className="mt-2 text-xs text-muted">Risk {risk}. Equity ${usd(trader.accountValue)} against open notional.</p>
+                </div>
               ) : null}
-            </ul>
-          </article>
-        ))}
+            </article>
+          )
+        })}
       </div>
     </section>
   )

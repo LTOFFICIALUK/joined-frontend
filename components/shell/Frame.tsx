@@ -10,9 +10,7 @@ import { Footer } from "@/components/shell/Footer"
 
 const links = [
   { href: "/traders", label: "Traders" },
-  { href: "/copies", label: "My copies" },
-  { href: "/positions", label: "Positions" },
-  { href: "/funds", label: "Funds" },
+  { href: "/portfolio", label: "Portfolio" },
 ]
 
 export const Frame = ({ children }: { children: React.ReactNode }) => {
@@ -86,7 +84,7 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
           </nav>
         </div>
       </header>
-      <div className="flex flex-1 flex-col">
+      <div className={`flex flex-1 flex-col ${pathname.startsWith("/traders/") ? "pb-44 lg:pb-0" : ""}`}>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
         <Footer />
       </div>

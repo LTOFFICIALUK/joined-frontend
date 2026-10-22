@@ -144,6 +144,9 @@ export type Trader = {
   positions: TraderPosition[]
   pnl30Series: PnlPoint[]
   joined: number
+  winRate?: number
+  maxDrop?: number
+  score?: number
 }
 
 export type TraderFill = {
@@ -166,6 +169,7 @@ export type JoinRow = {
   createdAt: string
   traderPnl7d: number | null
   traderAccountValue: number | null
+  maxLeverage?: number | null
   positions: Array<{
     coin: string
     label: string
@@ -226,6 +230,15 @@ export type WithdrawProgress = {
   message: string
 }
 
+export type TapePrint = {
+  address: string
+  label: string
+  side: "long" | "short"
+  size: number
+  price: number
+  time: number
+}
+
 export type ActivityRow = {
   id: string
   kind: "deposit" | "withdraw"
@@ -246,11 +259,12 @@ export const api = {
     ),
   me: () => request<{ id: string; phantomPubkey: string; evmAddress: string | null }>("/auth/me"),
   traders: () => request<{ traders: Trader[]; asOf: number }>("/traders"),
+  tape: () => request<{ tape: TapePrint[]; asOf: number }>("/traders/tape"),
   trader: (address: string) =>
     request<{ trader: Trader; fills: TraderFill[]; asOf: number }>(`/traders/${address}`),
   joins: () => request<{ joins: JoinRow[] }>("/joins"),
-  join: (body: { trader: string; sizeUsd: number }) =>
-    request<{ id: string; trader: string; sizeUsd: number; status: string }>("/joins", {
+  join: (body: { trader: string; sizeUsd: number; maxLeverage?: number | null }) =>
+    request<{ id: string; trader: string; sizeUsd: number; maxLeverage: number | null; status: string }>("/joins", {
       method: "POST",
       body: JSON.stringify(body),
     }),

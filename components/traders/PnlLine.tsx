@@ -1,7 +1,8 @@
 import type { PnlPoint } from "@/lib/api"
 
-export const PnlLine = ({ points }: { points: PnlPoint[] }) => {
+export const PnlLine = ({ points, bare = false }: { points: PnlPoint[]; bare?: boolean }) => {
   if (points.length < 2) {
+    if (bare) return <div className="h-8" />
     return (
       <div>
         <p className="text-xs text-muted">30 day P&L</p>
@@ -23,8 +24,8 @@ export const PnlLine = ({ points }: { points: PnlPoint[] }) => {
   const up = points[points.length - 1].v >= points[0].v
   return (
     <div>
-      <p className="mb-1 text-xs text-muted">30 day P&L</p>
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-16 w-full" role="img" aria-label="30 day P and L">
+      {bare ? null : <p className="mb-1 text-xs text-muted">30 day P&L</p>}
+    <svg viewBox={`0 0 ${width} ${height}`} className={bare ? "h-8 w-16" : "h-16 w-full"} role="img" aria-label="30 day P and L">
       <path d={path} fill="none" stroke={up ? "#50D2C1" : "#FF5C7A"} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
     </div>

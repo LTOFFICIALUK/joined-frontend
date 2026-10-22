@@ -10,6 +10,9 @@ const config: NextConfig = {
         destination: "https://joined.fun/:path*",
         permanent: true,
       },
+      { source: "/copies", destination: "/portfolio", permanent: false },
+      { source: "/positions", destination: "/portfolio", permanent: false },
+      { source: "/funds", destination: "/portfolio", permanent: false },
     ]
   },
 }

@@ -20,6 +20,21 @@ export const usd = (n: number) => {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+export const compactUsd = (n: number) => {
+  if (!Number.isFinite(n)) return "Pending"
+  const abs = Math.abs(n)
+  const body = abs >= 1_000_000_000
+    ? `$${(abs / 1_000_000_000).toFixed(1)}B`
+    : abs >= 1_000_000
+      ? `$${(abs / 1_000_000).toFixed(1)}M`
+      : abs >= 10_000
+        ? `$${Math.round(abs / 1_000)}K`
+        : abs >= 1_000
+          ? `$${(abs / 1_000).toFixed(1)}K`
+          : `$${Math.round(abs)}`
+  return n < 0 ? `−${body}` : body
+}
+
 export const signedUsd = (n: number) => {
   if (!Number.isFinite(n)) return "Pending"
   const abs = Math.abs(n)

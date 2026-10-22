@@ -1,30 +1,24 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useEffect, useLayoutEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useState } from "react"
 import { Hold } from "@/components/brand/Hold"
+import { Avatar } from "@/components/traders/Avatar"
+import { JoinFlow } from "@/components/traders/JoinFlow"
 import { PnlLine } from "@/components/traders/PnlLine"
-import { useSession } from "@/app/providers"
-import { api, getToken, type Trader, type TraderFill } from "@/lib/api"
+import { api, type Trader, type TraderFill } from "@/lib/api"
 import { traderFromBoard } from "@/lib/boardCache"
-import { px, shortAddr, signedUsd, sz, usd, when } from "@/lib/format"
-
-const presets = [100, 250, 500, 1000]
+import { compactUsd, shortAddr, signedUsd, when } from "@/lib/format"
+import { groupPrints, monthStats, nicknameFor, positionBrief, printLine, riskOf } from "@/lib/traderStyle"
 
 export default function TraderPage() {
   const params = useParams<{ address: string }>()
   const address = params.address
-  const { session, connect, hint } = useSession()
   const [trader, setTrader] = useState<Trader | null>(null)
   const [fills, setFills] = useState<TraderFill[]>([])
   const [error, setError] = useState("")
-  const [preset, setPreset] = useState(250)
-  const [custom, setCustom] = useState("")
-  const [busy, setBusy] = useState(false)
-  const [note, setNote] = useState("")
   const [showAllFills, setShowAllFills] = useState(false)
   const [showAllPositions, setShowAllPositions] = useState(false)
-
   const [fillsReady, setFillsReady] = useState(false)
 
   useLayoutEffect(() => {
@@ -59,57 +53,44 @@ export default function TraderPage() {
     }
   }, [address])
 
-  const size = custom.trim() ? Number(custom) : preset
+  const prints = useMemo(() => groupPrints(fills), [fills])
 
-  const handleJoin = async () => {
-    if (!Number.isFinite(size) || size < 10) {
-      setNote("Minimum join size is $10.")
-      return
-    }
-    setBusy(true)
-    setNote("")
-    try {
-      if (!session && !getToken()) {
-        const ok = await connect()
-        if (!ok || !getToken()) return
-      }
-      await api.join({ trader: address, sizeUsd: size })
-      setNote("You are copying this trader. New stock trades will follow from here.")
-    } catch (err) {
-      setNote(err instanceof Error ? err.message : "Could not join")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (!trader && !error) {
-    return (
-      <section>
-        <Hold />
-      </section>
-    )
-  }
-  if (error && !trader) {
-    return <p className="text-sm text-down">{error}</p>
-  }
+  if (!trader && !error) return <section><Hold /></section>
+  if (error && !trader) return <p className="text-sm text-down">{error}</p>
   if (!trader) return null
+
+  const risk = riskOf(trader)
+  const stats = monthStats(trader.pnl30Series)
+  const win = trader.winRate ?? stats.winRate
+  const drop = trader.maxDrop ?? stats.maxDrop
+  const positions = showAllPositions ? trader.positions : trader.positions.slice(0, 5)
+  const shownPrints = showAllFills ? prints : prints.slice(0, 8)
 
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="order-2 lg:order-1">
-        <p className="break-all font-mono text-xs text-muted">{trader.address}</p>
-        <h1 className="mt-2 font-mono text-3xl font-bold sm:text-4xl">{shortAddr(trader.address)}</h1>
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <div className="rounded-card border border-line p-4">
-            <p className={`font-display text-3xl font-extrabold ${trader.pnl7d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl7d)}</p>
-            <p className="mt-1 text-xs text-muted">7 day P&L</p>
+      <div>
+        <div className="flex items-center gap-3">
+          <Avatar address={trader.address} />
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-3xl font-extrabold">{nicknameFor(trader)}</h1>
+            <p className="mt-1 break-all font-mono text-xs text-muted">{trader.address}</p>
           </div>
+        </div>
+        <p className="mt-3 text-sm">
+          <span className={risk === "High" ? "text-down" : risk === "Medium" ? "text-paper" : "text-teal"}>{risk} risk</span>
+          <span className="text-muted"> · {shortAddr(trader.address)}</span>
+        </p>
+        <div className="mt-6 grid grid-cols-2 gap-3">
           <div className="rounded-card border border-line p-4">
             <p className={`font-display text-3xl font-extrabold ${trader.pnl30d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl30d)}</p>
             <p className="mt-1 text-xs text-muted">30 day P&L</p>
           </div>
+          <div className="rounded-card border border-line p-4">
+            <p className={`font-display text-3xl font-extrabold ${trader.pnl7d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl7d)}</p>
+            <p className="mt-1 text-xs text-muted">7 day P&L</p>
+          </div>
         </div>
-        <p className="mt-4 text-sm text-muted">Account ${usd(trader.accountValue)}. {trader.joined > 0 ? `${trader.joined} joined.` : "No one has joined yet."}</p>
+        <p className="mt-4 text-sm text-muted">Account {compactUsd(trader.accountValue)}. Win rate {Math.round(win * 100)}%. Biggest drop {compactUsd(drop)}. {trader.joined > 0 ? `${trader.joined} joined.` : "Be the first to join."}</p>
         <div className="mt-4 rounded-card border border-line p-4">
           <PnlLine points={trader.pnl30Series} />
         </div>
@@ -117,13 +98,9 @@ export default function TraderPage() {
         {trader.positions.length ? (
           <>
             <ul className="mt-3 space-y-2">
-              {(showAllPositions ? trader.positions : trader.positions.slice(0, 5)).map((position) => (
+              {positions.map((position) => (
                 <li key={position.coin} className="rounded-card border border-line px-4 py-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-display font-bold">{position.label}</span>
-                    <span className={position.side === "long" ? "text-teal" : "text-down"}>{position.side === "long" ? "Long" : "Short"}</span>
-                  </div>
-                  <p className="mt-1 font-mono text-xs text-muted">{sz(position.size)} size, {position.leverage}x, ${usd(position.positionValue)}</p>
+                  <p>{positionBrief(position)}</p>
                 </li>
               ))}
             </ul>
@@ -137,20 +114,19 @@ export default function TraderPage() {
           <p className="mt-3 text-sm text-muted">No open stock positions right now.</p>
         )}
         <h2 className="mt-8 font-display text-xl font-bold">Recent fills</h2>
-        {!fillsReady ? <div className="mt-3 h-16" /> : fills.length ? (
+        {!fillsReady ? <div className="mt-3 h-16" /> : shownPrints.length ? (
           <>
             <ul className="mt-3 space-y-2">
-              {(showAllFills ? fills : fills.slice(0, 8)).map((fill) => (
-                <li key={`${fill.id}-${fill.time}`} className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-line px-4 py-3 text-sm">
-                  <span>{fill.label} <span className={fill.side === "long" ? "text-teal" : "text-down"}>{fill.side === "long" ? "Buy" : "Sell"}</span></span>
-                  <span className="font-mono text-xs text-muted">{sz(fill.size)} at ${px(fill.price)}</span>
-                  <span className="text-xs text-muted">{when(fill.time)}</span>
+              {shownPrints.map((print) => (
+                <li key={print.key} className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-line px-4 py-3 text-sm">
+                  <span>{printLine(print)}</span>
+                  <span className="text-xs text-muted">{when(print.time)}</span>
                 </li>
               ))}
             </ul>
-            {fills.length > 8 ? (
+            {prints.length > 8 ? (
               <button type="button" onClick={() => setShowAllFills((current) => !current)} className="mt-3 text-sm text-teal">
-                {showAllFills ? "Show fewer fills" : `Show all ${fills.length} fills`}
+                {showAllFills ? "Show fewer fills" : `Show all ${prints.length} fills`}
               </button>
             ) : null}
           </>
@@ -158,43 +134,12 @@ export default function TraderPage() {
           <p className="mt-3 text-sm text-muted">Recent stock fills will show up here after this trader trades a stock perp.</p>
         )}
       </div>
-      <aside className="order-1 h-fit rounded-card border border-line p-4 lg:sticky lg:top-28 lg:order-2">
-        <h2 className="font-display text-xl font-bold">Join</h2>
-        <p className="mt-2 text-sm text-muted">Your size follows this trader from the next stock trade. Existing positions stay theirs.</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {presets.map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => {
-                setPreset(value)
-                setCustom("")
-              }}
-              className={`rounded-full py-2 font-display text-sm font-bold ${!custom && preset === value ? "bg-teal text-ink" : "border border-line text-paper"}`}
-            >
-              {value === 1000 ? "$1K" : `$${value}`}
-            </button>
-          ))}
-        </div>
-        <label className="mt-3 block text-xs text-muted" htmlFor="custom-size">Custom size in USD</label>
-        <input
-          id="custom-size"
-          inputMode="decimal"
-          value={custom}
-          onChange={(event) => setCustom(event.target.value)}
-          placeholder="Custom"
-          className="mt-1 w-full rounded-card border border-line bg-black px-3 py-3 font-display text-paper"
-        />
-        <button
-          type="button"
-          onClick={() => void handleJoin()}
-          disabled={busy}
-          className="mt-4 w-full rounded-full bg-teal py-3 font-display text-sm font-bold text-ink disabled:opacity-60"
-        >
-          {busy ? "Joining" : "Join with Phantom"}
-        </button>
-        {note || hint ? <p className="mt-3 text-sm text-paper">{note || hint}</p> : null}
+      <aside className="hidden h-fit rounded-card border border-line p-4 lg:sticky lg:top-28 lg:block">
+        <JoinFlow trader={trader} formId="desk" />
       </aside>
+      <div className="fixed inset-x-0 bottom-0 z-40 max-h-[70vh] overflow-y-auto border-t border-line bg-black px-4 py-3 lg:hidden">
+        <JoinFlow trader={trader} formId="bar" compact />
+      </div>
     </section>
   )
 }

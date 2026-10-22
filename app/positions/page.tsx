@@ -7,8 +7,10 @@ import { Hold } from "@/components/brand/Hold"
 import { EmptyGuide } from "@/components/shell/EmptyGuide"
 import { api, type LiveAccount, type Market } from "@/lib/api"
 import { px, signedUsd, sz, usd } from "@/lib/format"
+import { useEmbedded } from "@/lib/embed"
 
 export default function PositionsPage() {
+  const embedded = useEmbedded()
   const { session, ready, connect } = useSession()
   const [live, setLive] = useState<LiveAccount | null>(null)
   const [markets, setMarkets] = useState<Market[]>([])
@@ -66,21 +68,21 @@ export default function PositionsPage() {
 
   return (
     <section>
-      <h1 className="font-display text-4xl font-extrabold">Positions</h1>
+      {embedded ? <h2 className="font-display text-2xl font-bold">Positions</h2> : <h1 className="font-display text-4xl font-extrabold">Positions</h1>}
       <p className="mt-2 max-w-xl text-sm text-muted">Stock perps on your Hyperliquid account.</p>
-      {!session && ready ? (
+      {!embedded && !session && ready ? (
         <EmptyGuide
           title="No positions yet"
           body="These are the stock perps on your own Hyperliquid account, including the ones joined copies for you."
           steps={[
             "Connect Phantom.",
-            "Send SOL from Funds. It lands as USDC.",
+            "Send SOL from the join button. It lands as USDC.",
             "Join a trader. New stock trades show up here with live P&L.",
           ]}
           action={(
             <>
               <button type="button" onClick={() => void connect()} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Connect Phantom</button>
-              <Link href="/funds" className="rounded-full border border-line px-4 py-2 font-display text-sm font-bold">Open Funds</Link>
+              <Link href="/portfolio" className="rounded-full border border-line px-4 py-2 font-display text-sm font-bold">Open Portfolio</Link>
             </>
           )}
         />
@@ -95,13 +97,13 @@ export default function PositionsPage() {
           title={live.equityUsd > 0 ? "No open stock positions" : "Nothing open yet"}
           body={live.equityUsd > 0
             ? "When a trader you joined opens, adds, reduces, or closes a stock perp, the matching position shows up here."
-            : "USDC has to land before a copied trade can open. Deposit on Funds, then join a trader."}
+            : "USDC has to land before a copied trade can open. Send SOL from the join button, then confirm."}
           steps={[
-            "Check Funds for equity and anything still on the way.",
+            "Check the balance below for equity and anything still on the way.",
             "Join a trader from the next stock trade. The current book is not copied.",
             "Close here sends a reduce order for that position.",
           ]}
-          action={<Link href={live.equityUsd > 0 ? "/traders" : "/funds"} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">{live.equityUsd > 0 ? "Find a trader" : "Deposit on Funds"}</Link>}
+          action={<Link href={live.equityUsd > 0 ? "/traders" : "/portfolio"} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">{live.equityUsd > 0 ? "Find a trader" : "Open Portfolio"}</Link>}
         />
       ) : null}
       <div className="mt-6 space-y-3">

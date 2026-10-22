@@ -1,15 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { VersionedTransaction } from "@solana/web3.js"
 import { useSession } from "@/app/providers"
 import { Hold } from "@/components/brand/Hold"
 import { EmptyGuide } from "@/components/shell/EmptyGuide"
 import { api, type ActivityRow, type FundPreview, type LiveAccount, type WithdrawProgress } from "@/lib/api"
+import { depositSol } from "@/lib/deposit"
+import { useEmbedded } from "@/lib/embed"
 import { shortAddr, usd } from "@/lib/format"
-import { getPhantom, phantomError, signatureText, waitForPhantom } from "@/lib/phantom"
+import { phantomError } from "@/lib/phantom"
 
 export default function FundsPage() {
+  const embedded = useEmbedded()
   const { session, ready, connect } = useSession()
   const [live, setLive] = useState<LiveAccount | null>(null)
   const [tab, setTab] = useState<"deposit" | "withdraw">("deposit")
@@ -61,30 +63,8 @@ export default function FundsPage() {
       return
     }
     setBusy(true)
-    setMessage("Opening the swap. Phantom will ask you to send the SOL.")
     try {
-      const created = await api.liveDepositOpen(sol)
-      const provider = (await waitForPhantom()) ?? getPhantom()
-      if (!provider) throw new Error("Reconnect Phantom to send SOL.")
-      setMessage("Confirm the SOL send in Phantom.")
-      const bytes = Uint8Array.from(atob(created.tx), (char) => char.charCodeAt(0))
-      let transaction: VersionedTransaction
-      try {
-        transaction = VersionedTransaction.deserialize(bytes)
-      } catch {
-        throw new Error("Could not prepare the SOL transfer.")
-      }
-      const sent = await provider.signAndSendTransaction(transaction)
-      const txHash = signatureText(sent)
-      if (txHash.length < 32) throw new Error("Phantom did not return the transaction.")
-      await api.liveDepositSent(created.id, txHash)
-      setMessage("SOL is on the way. USDC is usually ready in a few seconds.")
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 2000))
-        const status = await api.liveDepositStatus(created.id)
-        setMessage(status.message)
-        if (status.stage === "done" || status.stage === "failed") break
-      }
+      await depositSol(sol, setMessage)
       await refresh()
     } catch (err) {
       setMessage(phantomError(err))
@@ -129,9 +109,9 @@ export default function FundsPage() {
 
   return (
     <section className="max-w-xl">
-      <h1 className="font-display text-4xl font-extrabold">Funds</h1>
+      {embedded ? <h2 className="font-display text-2xl font-bold">Funds</h2> : <h1 className="font-display text-4xl font-extrabold">Funds</h1>}
       <p className="mt-2 text-sm text-muted">Send SOL from Phantom. It lands as USDC on your Hyperliquid account. Withdrawals come back as SOL.</p>
-      {!session && ready ? (
+      {!embedded && !session && ready ? (
         <EmptyGuide
           title="Funds stay in your Hyperliquid account"
           body="SOL leaves this Phantom and arrives as USDC. Withdrawals come back to the same Phantom as SOL. Nothing moves until you confirm it."

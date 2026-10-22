@@ -50,6 +50,19 @@ export const Home = () => {
         <Link href="/traders" className="mt-6 inline-flex rounded-full bg-teal px-5 py-3 font-display text-sm font-bold text-ink">
           Find a trader
         </Link>
+        <ol className="mt-8 grid gap-3 sm:grid-cols-3">
+          {[
+            ["1", "Pick a trader", "Open the board and choose a wallet with stock perps on."],
+            ["2", "Choose a size", "Your copy is a dollar size, with a leverage cap if you want one."],
+            ["3", "Follow the next trade", "Connect Phantom, send SOL if the account is empty, then confirm."],
+          ].map(([step, title, body]) => (
+            <li key={step} className="rounded-card border border-line p-4">
+              <p className="font-display text-sm font-bold text-teal">{step}</p>
+              <p className="mt-2 font-display text-base font-bold">{title}</p>
+              <p className="mt-1 text-sm text-muted">{body}</p>
+            </li>
+          ))}
+        </ol>
         <HomeBoard orbitRef={setOrbit} showBubbles={!cover} onReady={handleReady} />
       </section>
     </>
