@@ -19,12 +19,12 @@ html, body {
   background: #000;
   color: #f2f2f0;
   overflow-anchor: none;
+  overflow-x: hidden;
   scrollbar-gutter: stable;
 }
 
 body {
   margin: 0;
-  overflow-x: hidden;
 }
 
 button, input { font: inherit; }
