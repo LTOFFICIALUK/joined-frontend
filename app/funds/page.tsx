@@ -110,7 +110,7 @@ export default function FundsPage() {
   return (
     <section className="max-w-xl">
       {embedded ? <h2 className="font-display text-2xl font-bold">Funds</h2> : <h1 className="font-display text-4xl font-extrabold">Funds</h1>}
-      <p className="mt-2 text-sm text-muted">Send SOL from Phantom. It lands as USDC on your Hyperliquid account. Withdrawals come back as SOL.</p>
+      <p className="mt-3 text-sm leading-relaxed text-muted">Send SOL from Phantom. It lands as USDC on your Hyperliquid account. Withdrawals come back as SOL.</p>
       {!embedded && !session && ready ? (
         <EmptyGuide
           title="Funds stay in your Hyperliquid account"

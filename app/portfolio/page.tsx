@@ -14,7 +14,7 @@ export default function PortfolioPage() {
   return (
     <section>
       <h1 className="font-display text-4xl font-extrabold">Portfolio</h1>
-      <p className="mt-2 max-w-xl text-sm text-muted">Your copies, your stock positions, and the SOL that funds them.</p>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">Your copies, your stock positions, and the SOL that funds them.</p>
       {!session && ready ? (
         <EmptyGuide
           title="Nothing in the portfolio yet"

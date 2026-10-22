@@ -24,7 +24,7 @@ export const Footer = () => {
 
   return (
     <footer className="mt-auto border-t border-line">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-8 sm:flex-row sm:items-end sm:justify-between sm:gap-6 sm:px-6 sm:py-10 lg:px-8">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {BRAND.x ? (
             <a href={BRAND.x} className="font-display text-sm font-bold text-paper" target="_blank" rel="noreferrer">

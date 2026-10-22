@@ -169,7 +169,7 @@ export default function TradersPage() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-4xl font-extrabold">Traders</h1>
-          <p className="mt-2 max-w-xl text-sm text-muted">Ranked by 30 day P&L, how often the month went up, and the biggest drop. 30 day is the number on the row.</p>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">Ranked by 30 day P&L, how often the month went up, and the biggest drop. 30 day is the number on the row.</p>
         </div>
         <div className="mb-1 text-right text-xs text-muted">
           <span className="inline-flex items-center gap-2">

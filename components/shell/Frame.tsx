@@ -15,6 +15,8 @@ const links = [
   { href: "/portfolio", label: "Portfolio" },
 ]
 
+const gutter = "px-4 sm:px-6 lg:px-8"
+
 export const Frame = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname()
   const { session, busy, hint, connect, disconnect } = useSession()
@@ -27,7 +29,7 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-line bg-black">
-        <div className="mx-auto w-full max-w-6xl px-4 py-3">
+        <div className={`mx-auto w-full max-w-6xl py-3 sm:py-4 ${gutter}`}>
           <div className="flex items-center gap-3">
           <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="joined home">
             <img src="/brand/joined-mark-white.svg" alt="" className="h-7 w-7" />
@@ -87,7 +89,7 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
         </div>
       </header>
       <div className={`flex flex-1 flex-col ${pathname.startsWith("/traders/") ? "pb-44 lg:pb-0" : ""}`}>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+        <main className={`mx-auto w-full max-w-6xl flex-1 ${gutter} ${pathname === "/" ? "pb-16 pt-12 sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-28" : "py-10 sm:py-14 lg:py-16"}`}>{children}</main>
         <Footer />
       </div>
       {open && !session ? (

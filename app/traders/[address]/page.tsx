@@ -285,7 +285,7 @@ export default function TraderPage() {
         </div>
       </aside>
       {trader ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-black p-3 lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-black px-4 py-3 sm:px-6 lg:hidden">
           <JoinFlow trader={trader} formId="bar" compact />
         </div>
       ) : null}

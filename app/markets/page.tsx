@@ -32,7 +32,7 @@ export default function MarketsPage() {
   return (
     <section className="min-w-0">
       <h1 className="font-display text-4xl font-extrabold">Markets</h1>
-      <p className="mt-2 max-w-xl text-sm text-muted">Stock perps the top wallets hold, split by dollars and by wallets.</p>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">Stock perps the top wallets hold, split by dollars and by wallets.</p>
       {error ? <div className="mt-6"><ApiDown message={error} onRetry={() => setAttempt((value) => value + 1)} /></div> : null}
       {rows === null && !error ? (
         <div className="mt-6 space-y-3">

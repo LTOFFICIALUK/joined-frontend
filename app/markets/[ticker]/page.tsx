@@ -41,7 +41,7 @@ export default function MarketPage() {
   return (
     <section className="min-w-0">
       <h1 className="font-display text-4xl font-extrabold">{ticker}</h1>
-      <p className="mt-2 text-sm text-muted">How the top wallets are positioned.</p>
+      <p className="mt-3 text-sm leading-relaxed text-muted">How the top wallets are positioned.</p>
       {error ? <div className="mt-6"><ApiDown message={error} onRetry={() => setAttempt((value) => value + 1)} /></div> : null}
       {!market && !error ? <div className="mt-6 space-y-3"><Skeleton className="h-16 w-full" /><Skeleton /><Skeleton /></div> : null}
       {market ? (

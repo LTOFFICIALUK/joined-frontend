@@ -40,7 +40,7 @@ export default function StatsPage() {
   return (
     <section>
       <h1 className="font-display text-4xl font-extrabold">Stats</h1>
-      <p className="mt-2 text-sm text-muted">Joins, copied size, and the newest copied trades.</p>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">Joins, copied size, and the newest copied trades.</p>
       {error ? <div className="mt-6"><ApiDown message={error} onRetry={() => setAttempt((value) => value + 1)} /></div> : null}
       {!stats && !error ? <div className="mt-6 grid grid-cols-2 gap-3"><Skeleton /><Skeleton /><Skeleton /><Skeleton /></div> : null}
       {stats ? (

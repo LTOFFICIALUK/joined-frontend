@@ -69,7 +69,7 @@ export default function PositionsPage() {
   return (
     <section>
       {embedded ? <h2 className="font-display text-2xl font-bold">Positions</h2> : <h1 className="font-display text-4xl font-extrabold">Positions</h1>}
-      <p className="mt-2 max-w-xl text-sm text-muted">Stock perps on your Hyperliquid account.</p>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">Stock perps on your Hyperliquid account.</p>
       {!embedded && !session && ready ? (
         <EmptyGuide
           title="No positions yet"

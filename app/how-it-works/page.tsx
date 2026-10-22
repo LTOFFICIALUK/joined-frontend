@@ -36,7 +36,7 @@ export default function HowPage() {
   return (
     <section className="max-w-2xl">
       <h1 className="font-display text-4xl font-extrabold">How it works</h1>
-      <div className="mt-6 space-y-6">
+      <div className="mt-8 space-y-8 sm:mt-10 sm:space-y-10">
         {blocks.map((block) => (
           <article key={block.title}>
             <h2 className="font-display text-xl font-bold">{block.title}</h2>

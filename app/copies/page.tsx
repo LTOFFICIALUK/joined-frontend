@@ -94,7 +94,7 @@ export default function CopiesPage() {
   return (
     <section>
       {embedded ? <h2 className="font-display text-2xl font-bold">Copies</h2> : <h1 className="font-display text-4xl font-extrabold">My copies</h1>}
-      <p className="mt-2 max-w-xl text-sm text-muted">Active joins and the positions copied onto your Hyperliquid account.</p>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">Active joins and the positions copied onto your Hyperliquid account.</p>
       {!embedded && !session && ready ? (
         <EmptyGuide
           title="Nothing copied yet"

@@ -146,7 +146,7 @@ export const HomeBoard = ({
   }
 
   return (
-    <div className="mt-10">
+    <div className="mt-12 sm:mt-16 lg:mt-20">
       {error ? <div className="mb-6"><ApiDown message={error} onRetry={() => setAttempt((value) => value + 1)} /></div> : null}
       {traders && !traders.length && !error ? (
         <p className="mb-6 text-sm text-muted">No open stock positions on the leaderboard right now. Traders with open Hyperliquid stock perps will show up here.</p>

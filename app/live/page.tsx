@@ -65,7 +65,7 @@ export default function LivePage() {
           {paused ? "Paused" : "Streaming"}
         </span>
       </div>
-      <p className="mt-2 max-w-xl text-sm text-muted">New stock trades from the wallets on the board.</p>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">New stock trades from the wallets on the board.</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={() => setPaused((value) => !value)} className="rounded-full border border-line px-3 py-1.5 font-display text-xs font-bold">
           {paused ? "Resume" : "Pause"}
