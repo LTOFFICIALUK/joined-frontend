@@ -21,16 +21,6 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    const titles: Record<string, string> = {
-      "/": "joined. One trader. Everyone joins in.",
-      "/traders": "joined: Traders",
-      "/copies": "joined: My copies",
-      "/positions": "joined: Positions",
-      "/funds": "joined: Funds",
-    }
-    document.title = pathname.startsWith("/traders/")
-      ? "joined: Trader"
-      : titles[pathname] ?? "joined: Page not found"
     window.scrollTo(0, 0)
   }, [pathname])
 
