@@ -53,7 +53,7 @@ export default function TradersPage() {
       </div>
       {error ? <p className="mt-6 text-sm text-down">{error}</p> : null}
       {traders && !traders.length && !error ? (
-        <p className="mt-8 rounded-card border border-line p-6 text-sm text-muted">No open stock positions on the leaderboard right now. Traders with open Hyperliquid stock perps will show up here.</p>
+        <p className="mt-8 rounded-card border border-line p-6 text-sm leading-relaxed text-muted">No open stock positions on the leaderboard right now. When a top wallet has an open Hyperliquid stock perp, it shows up here with 7 day P&L, 30 day P&L, and a Join button.</p>
       ) : null}
       {traders === null && !error ? <Hold /> : null}
       <div className={`mt-6 space-y-3 ${traders ? "motion-safe:animate-settle" : ""}`}>
@@ -62,7 +62,7 @@ export default function TradersPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-mono text-sm">{shortAddr(trader.address)}</p>
-                <p className="mt-1 text-xs text-muted">#{index + 1}, account ${usd(trader.accountValue)}, {trader.joined} joined</p>
+                <p className="mt-1 text-xs text-muted">#{index + 1}, account ${usd(trader.accountValue)}{trader.joined > 0 ? `, ${trader.joined} joined` : ""}</p>
               </div>
               <Link href={`/traders/${trader.address}`} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">
                 Join
@@ -82,7 +82,7 @@ export default function TradersPage() {
               <PnlLine points={trader.pnl30Series} />
             </div>
             <ul className="mt-4 space-y-2">
-              {trader.positions.map((position) => (
+              {trader.positions.slice(0, 4).map((position) => (
                 <li key={position.coin} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                   <span>
                     <span className={position.side === "long" ? "text-teal" : "text-down"}>{position.side === "long" ? "Long" : "Short"}</span>
@@ -91,6 +91,9 @@ export default function TradersPage() {
                   <span className="font-mono text-xs text-muted">{sz(position.size)}, {position.leverage}x, ${usd(position.positionValue)}</span>
                 </li>
               ))}
+              {trader.positions.length > 4 ? (
+                <li className="text-xs text-muted">{trader.positions.length - 4} more positions</li>
+              ) : null}
             </ul>
           </article>
         ))}

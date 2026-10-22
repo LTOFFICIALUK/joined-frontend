@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { shortAddr } from "@/lib/format"
 import { phantomInstallUrl } from "@/lib/phantom"
 import { useSession } from "@/app/providers"
@@ -19,27 +19,31 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname()
   const { session, busy, hint, connect, disconnect } = useSession()
   const [open, setOpen] = useState(false)
-  const [shown, setShown] = useState(true)
-  const path = useRef(pathname)
 
-  useLayoutEffect(() => {
-    if (path.current === pathname) return
-    path.current = pathname
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      "/": "joined. One trader. Everyone joins in.",
+      "/traders": "joined: Traders",
+      "/copies": "joined: My copies",
+      "/positions": "joined: Positions",
+      "/funds": "joined: Funds",
+    }
+    document.title = pathname.startsWith("/traders/")
+      ? "joined: Trader"
+      : titles[pathname] ?? "joined: Page not found"
     window.scrollTo(0, 0)
-    setShown(false)
-    const timer = window.setTimeout(() => setShown(true), 40)
-    return () => window.clearTimeout(timer)
   }, [pathname])
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-line bg-black">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4">
-          <Link href="/" className="flex items-center gap-2" aria-label="joined home">
+        <div className="mx-auto w-full max-w-6xl px-4 py-3">
+          <div className="flex items-center gap-3">
+          <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="joined home">
             <img src="/brand/joined-mark-white.svg" alt="" className="h-7 w-7" />
             <span className="font-display text-[22px] font-extrabold tracking-tight">joined</span>
           </Link>
-          <nav className="flex flex-wrap items-center gap-1" aria-label="Primary">
+          <nav className="hidden min-w-0 flex-1 items-center gap-1 sm:flex" aria-label="Primary">
             {links.map((link) => {
               const active = pathname === link.href || pathname.startsWith(`${link.href}/`)
               return (
@@ -54,7 +58,7 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
               )
             })}
           </nav>
-          <div className="ml-auto">
+          <div className="ml-auto shrink-0">
             {session ? (
               <button
                 type="button"
@@ -74,9 +78,25 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
               </button>
             )}
           </div>
+          </div>
+          <nav className="mt-3 flex flex-wrap items-center gap-1 sm:hidden" aria-label="Primary mobile">
+            {links.map((link) => {
+              const active = pathname === link.href || pathname.startsWith(`${link.href}/`)
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`rounded-full px-3 py-1.5 text-sm ${active ? "bg-teal text-ink" : "text-muted"}`}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {link.label}
+                </Link>
+              )
+            })}
+          </nav>
         </div>
       </header>
-      <div className={`flex flex-1 flex-col ${shown ? "opacity-100 transition-opacity duration-300 ease-out motion-reduce:transition-none" : "opacity-0"}`}>
+      <div className="flex flex-1 flex-col">
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
         <Footer />
       </div>
@@ -89,8 +109,18 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
             className="w-full max-w-md rounded-card border border-line bg-black p-5"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="font-display text-2xl font-bold">Connect Phantom</h2>
-            <p className="mt-2 text-sm text-muted">Sign in to join a trader, fund your Hyperliquid account, and see your copies.</p>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="font-display text-2xl font-bold">Connect Phantom</h2>
+              <button
+                type="button"
+                onClick={() => { if (!busy) setOpen(false) }}
+                className="rounded-full border border-line px-3 py-1.5 font-display text-xs font-bold text-paper"
+                aria-label="Close connect dialog"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-muted">Sign in to join a trader, fund your Hyperliquid account, and see your copies. Phantom asks you to sign a login message. It does not send funds.</p>
             <p className="mt-4 min-h-5 text-sm text-paper">{hint}</p>
             {hint === "Phantom is not installed" ? (
               <a href={phantomInstallUrl} className="mt-4 inline-flex rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Get Phantom</a>

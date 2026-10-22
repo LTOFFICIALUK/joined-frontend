@@ -42,6 +42,7 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
   const mark = useRef<HTMLImageElement>(null)
   const word = useRef<HTMLParagraphElement>(null)
   const veil = useRef<HTMLDivElement>(null)
+  const root = useRef<HTMLDivElement>(null)
   const departed = useRef(false)
   const canDepartRef = useRef(canDepart)
   const orbitRef = useRef(orbit)
@@ -71,6 +72,7 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
     const beginDepart = () => {
       const target = orbitRef.current?.getBoundingClientRect()
       onDepartRef.current()
+      if (root.current) root.current.style.pointerEvents = "none"
       if (veil.current) veil.current.style.opacity = "0"
       if (mark.current) {
         mark.current.style.transition = "opacity 500ms ease"
@@ -153,7 +155,10 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
       }
       if (word.current) word.current.style.opacity = String(formed)
 
-      if (time >= gatherEnd && canDepartRef.current && orbitRef.current && !departed.current) {
+      const elapsed = now - started
+      const gathered = elapsed >= gatherEnd
+      const waitedLongEnough = elapsed > gatherEnd + 2200
+      if (gathered && !departed.current && (canDepartRef.current || waitedLongEnough)) {
         finished = true
         departed.current = true
         beginDepart()
@@ -162,15 +167,28 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
       frame = window.requestAnimationFrame(paint)
     }
 
+    const release = () => {
+      if (departed.current || finished) return
+      const elapsed = performance.now() - started
+      const gathered = elapsed >= gatherEnd
+      const waitedLongEnough = elapsed > gatherEnd + 2200
+      if (!gathered || (!canDepartRef.current && !waitedLongEnough)) return
+      finished = true
+      departed.current = true
+      beginDepart()
+    }
+
     frame = window.requestAnimationFrame(paint)
+    const watchdog = window.setInterval(release, 200)
     return () => {
       finished = true
       window.cancelAnimationFrame(frame)
+      window.clearInterval(watchdog)
     }
   }, [])
 
   return (
-    <div className="fixed inset-0 z-[80]" role="status" aria-live="polite" aria-label="Loading joined">
+    <div ref={root} className="fixed inset-0 z-[80]" role="status" aria-live="polite" aria-label="Loading joined">
       <div ref={veil} className="absolute inset-0 bg-black transition-opacity duration-[1200ms] ease-out" />
       {BUBBLES.map((bubble, index) => {
         const start = wanderAt(index, 0)

@@ -2,7 +2,12 @@ import type { PnlPoint } from "@/lib/api"
 
 export const PnlLine = ({ points }: { points: PnlPoint[] }) => {
   if (points.length < 2) {
-    return <p className="flex h-16 items-center text-xs leading-relaxed text-muted">30 day P&L line will show when Hyperliquid has history for this wallet.</p>
+    return (
+      <div>
+        <p className="text-xs text-muted">30 day P&L</p>
+        <p className="flex h-16 items-center text-xs leading-relaxed text-muted">The line shows when Hyperliquid has history for this wallet.</p>
+      </div>
+    )
   }
   const width = 280
   const height = 72
@@ -17,8 +22,11 @@ export const PnlLine = ({ points }: { points: PnlPoint[] }) => {
   }).join(" ")
   const up = points[points.length - 1].v >= points[0].v
   return (
+    <div>
+      <p className="mb-1 text-xs text-muted">30 day P&L</p>
     <svg viewBox={`0 0 ${width} ${height}`} className="h-16 w-full" role="img" aria-label="30 day P and L">
       <path d={path} fill="none" stroke={up ? "#50D2C1" : "#FF5C7A"} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
+    </div>
   )
 }

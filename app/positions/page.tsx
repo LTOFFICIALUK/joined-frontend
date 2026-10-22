@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "@/app/providers"
+import Link from "next/link"
 import { Hold } from "@/components/brand/Hold"
+import { EmptyGuide } from "@/components/shell/EmptyGuide"
 import { api, type LiveAccount, type Market } from "@/lib/api"
 import { px, signedUsd, sz, usd } from "@/lib/format"
 
@@ -67,10 +69,21 @@ export default function PositionsPage() {
       <h1 className="font-display text-4xl font-extrabold">Positions</h1>
       <p className="mt-2 max-w-xl text-sm text-muted">Stock perps on your Hyperliquid account.</p>
       {!session && ready ? (
-        <div className="mt-8 rounded-card border border-line p-6">
-          <p className="text-sm text-muted">Connect Phantom to see positions.</p>
-          <button type="button" onClick={() => void connect()} className="mt-4 rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Connect Phantom</button>
-        </div>
+        <EmptyGuide
+          title="No positions yet"
+          body="These are the stock perps on your own Hyperliquid account, including the ones joined copies for you."
+          steps={[
+            "Connect Phantom.",
+            "Send SOL from Funds. It lands as USDC.",
+            "Join a trader. New stock trades show up here with live P&L.",
+          ]}
+          action={(
+            <>
+              <button type="button" onClick={() => void connect()} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Connect Phantom</button>
+              <Link href="/funds" className="rounded-full border border-line px-4 py-2 font-display text-sm font-bold">Open Funds</Link>
+            </>
+          )}
+        />
       ) : null}
       {(!ready || (session && !live && !error)) ? <Hold /> : null}
       {live ? (
@@ -78,7 +91,18 @@ export default function PositionsPage() {
       ) : null}
       {error ? <p className="mt-4 text-sm text-down">{error}</p> : null}
       {session && live && !live.positions.length ? (
-        <p className="mt-8 rounded-card border border-line p-6 text-sm text-muted">Open stock positions from the traders you join will show up here.</p>
+        <EmptyGuide
+          title={live.equityUsd > 0 ? "No open stock positions" : "Nothing open yet"}
+          body={live.equityUsd > 0
+            ? "When a trader you joined opens, adds, reduces, or closes a stock perp, the matching position shows up here."
+            : "USDC has to land before a copied trade can open. Deposit on Funds, then join a trader."}
+          steps={[
+            "Check Funds for equity and anything still on the way.",
+            "Join a trader from the next stock trade. The current book is not copied.",
+            "Close here sends a reduce order for that position.",
+          ]}
+          action={<Link href={live.equityUsd > 0 ? "/traders" : "/funds"} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">{live.equityUsd > 0 ? "Find a trader" : "Deposit on Funds"}</Link>}
+        />
       ) : null}
       <div className="mt-6 space-y-3">
         {live?.positions.map((position) => (

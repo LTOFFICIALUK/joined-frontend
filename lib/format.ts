@@ -42,7 +42,12 @@ export const shortAddr = (value: string) => {
 
 export const sz = (n: number) => {
   if (!Number.isFinite(n)) return "Pending"
-  if (n >= 100) return n.toFixed(2)
-  if (n >= 1) return n.toFixed(3)
-  return n.toFixed(4)
+  const digits = n >= 100 ? 2 : n >= 1 ? 3 : 4
+  return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: digits })
+}
+
+export const when = (time: number) => {
+  if (!Number.isFinite(time) || time <= 0) return "Pending"
+  const ms = time < 1e12 ? time * 1000 : time
+  return new Date(ms).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }

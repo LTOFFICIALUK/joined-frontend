@@ -7,7 +7,7 @@ import { PnlLine } from "@/components/traders/PnlLine"
 import { useSession } from "@/app/providers"
 import { api, getToken, type Trader, type TraderFill } from "@/lib/api"
 import { traderFromBoard } from "@/lib/boardCache"
-import { px, shortAddr, signedUsd, sz, usd } from "@/lib/format"
+import { px, shortAddr, signedUsd, sz, usd, when } from "@/lib/format"
 
 const presets = [100, 250, 500, 1000]
 
@@ -22,6 +22,7 @@ export default function TraderPage() {
   const [custom, setCustom] = useState("")
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState("")
+  const [showAllFills, setShowAllFills] = useState(false)
 
   const [fillsReady, setFillsReady] = useState(false)
 
@@ -29,6 +30,7 @@ export default function TraderPage() {
     setTrader(traderFromBoard(address))
     setFills([])
     setFillsReady(false)
+    setShowAllFills(false)
     setError("")
   }, [address])
 
@@ -92,9 +94,9 @@ export default function TraderPage() {
 
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div>
-        <p className="font-mono text-sm text-muted">{trader.address}</p>
-        <h1 className="mt-2 font-display text-4xl font-extrabold">{shortAddr(trader.address)}</h1>
+      <div className="order-2 lg:order-1">
+        <p className="break-all font-mono text-xs text-muted">{trader.address}</p>
+        <h1 className="mt-2 font-mono text-3xl font-bold sm:text-4xl">{shortAddr(trader.address)}</h1>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <div className="rounded-card border border-line p-4">
             <p className={`font-display text-3xl font-extrabold ${trader.pnl7d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl7d)}</p>
@@ -105,7 +107,7 @@ export default function TraderPage() {
             <p className="mt-1 text-xs text-muted">30 day P&L</p>
           </div>
         </div>
-        <p className="mt-4 text-sm text-muted">Account ${usd(trader.accountValue)}. {trader.joined} joined.</p>
+        <p className="mt-4 text-sm text-muted">Account ${usd(trader.accountValue)}. {trader.joined > 0 ? `${trader.joined} joined.` : "No one has joined yet."}</p>
         <div className="mt-4 rounded-card border border-line p-4">
           <PnlLine points={trader.pnl30Series} />
         </div>
@@ -125,19 +127,27 @@ export default function TraderPage() {
         </ul>
         <h2 className="mt-8 font-display text-xl font-bold">Recent fills</h2>
         {!fillsReady ? <div className="mt-3 h-16" /> : fills.length ? (
-          <ul className="mt-3 space-y-2">
-            {fills.map((fill) => (
-              <li key={`${fill.id}-${fill.time}`} className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-line px-4 py-3 text-sm">
-                <span>{fill.label} <span className={fill.side === "long" ? "text-teal" : "text-down"}>{fill.side === "long" ? "Buy" : "Sell"}</span></span>
-                <span className="font-mono text-xs text-muted">{sz(fill.size)} @ ${px(fill.price)}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="mt-3 space-y-2">
+              {(showAllFills ? fills : fills.slice(0, 8)).map((fill) => (
+                <li key={`${fill.id}-${fill.time}`} className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-line px-4 py-3 text-sm">
+                  <span>{fill.label} <span className={fill.side === "long" ? "text-teal" : "text-down"}>{fill.side === "long" ? "Buy" : "Sell"}</span></span>
+                  <span className="font-mono text-xs text-muted">{sz(fill.size)} at ${px(fill.price)}</span>
+                  <span className="text-xs text-muted">{when(fill.time)}</span>
+                </li>
+              ))}
+            </ul>
+            {fills.length > 8 ? (
+              <button type="button" onClick={() => setShowAllFills((current) => !current)} className="mt-3 text-sm text-teal">
+                {showAllFills ? "Show fewer fills" : `Show all ${fills.length} fills`}
+              </button>
+            ) : null}
+          </>
         ) : (
-          <p className="mt-3 text-sm text-muted">Recent stock fills will show up here.</p>
+          <p className="mt-3 text-sm text-muted">Recent stock fills will show up here after this trader trades a stock perp.</p>
         )}
       </div>
-      <aside className="h-fit rounded-card border border-line p-4 lg:sticky lg:top-24">
+      <aside className="order-1 h-fit rounded-card border border-line p-4 lg:sticky lg:top-28 lg:order-2">
         <h2 className="font-display text-xl font-bold">Join</h2>
         <p className="mt-2 text-sm text-muted">Your size follows this trader from the next stock trade. Existing positions stay theirs.</p>
         <div className="mt-4 grid grid-cols-2 gap-2">

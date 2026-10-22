@@ -29,9 +29,9 @@ const Orbit = ({
         <div className="absolute left-1/2 top-1/2 z-10 flex h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-white px-3 text-center text-ink">
           {trader ? (
             <>
-              <p className="font-mono text-[11px] sm:text-xs">{shortAddr(trader.address)}</p>
-              <p className={`mt-1 font-display text-xl font-extrabold sm:text-3xl ${trader.pnl7d >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(trader.pnl7d)}</p>
-              <p className="mt-1 text-[10px] uppercase tracking-wide text-ink/60">7 day P&L</p>
+              <p className="font-mono text-[11px] text-ink sm:text-xs">{shortAddr(trader.address)}</p>
+              <p className="mt-1 font-display text-xl font-extrabold text-ink sm:text-3xl">{signedUsd(trader.pnl7d)}</p>
+              <p className="mt-1 text-[10px] text-ink/70">7 day P&L</p>
             </>
           ) : (
             <p className="font-display text-sm font-bold">Pending</p>
@@ -39,14 +39,14 @@ const Orbit = ({
         </div>
       </div>
       <p className="mt-3 text-center text-xs text-muted">
-        {decorative ? "Decoration" : `${count} joined`}
+        {decorative ? "No one has joined yet" : `${count} joined`}
       </p>
     </div>
   )
 }
 
 const Card = ({ trader, rank }: { trader: Trader; rank: number }) => {
-  const lead = trader.positions[0]
+  const lead = [...trader.positions].sort((a, b) => b.positionValue - a.positionValue)[0]
   return (
     <Link href={`/traders/${trader.address}`} className="block rounded-card border border-line p-4">
       <div className="flex items-center justify-between gap-3">
@@ -58,10 +58,11 @@ const Card = ({ trader, rank }: { trader: Trader; rank: number }) => {
       <p className="mt-3 text-sm text-muted">Account ${usd(trader.accountValue)}</p>
       {lead ? (
         <p className="mt-3 text-sm">
-          <span className={lead.side === "long" ? "text-teal" : "text-down"}>{lead.side.toUpperCase()}</span>
+          <span className={lead.side === "long" ? "text-teal" : "text-down"}>{lead.side === "long" ? "Long" : "Short"}</span>
           {" "}{lead.label}, ${usd(lead.positionValue)}, {lead.leverage}x
         </p>
       ) : null}
+      <p className="mt-3 text-xs text-teal">View trader</p>
     </Link>
   )
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { VersionedTransaction } from "@solana/web3.js"
 import { useSession } from "@/app/providers"
 import { Hold } from "@/components/brand/Hold"
+import { EmptyGuide } from "@/components/shell/EmptyGuide"
 import { api, type ActivityRow, type FundPreview, type LiveAccount, type WithdrawProgress } from "@/lib/api"
 import { shortAddr, usd } from "@/lib/format"
 import { getPhantom, phantomError, signatureText, waitForPhantom } from "@/lib/phantom"
@@ -131,10 +132,16 @@ export default function FundsPage() {
       <h1 className="font-display text-4xl font-extrabold">Funds</h1>
       <p className="mt-2 text-sm text-muted">Send SOL from Phantom. It lands as USDC on your Hyperliquid account. Withdrawals come back as SOL.</p>
       {!session && ready ? (
-        <div className="mt-8 rounded-card border border-line p-6">
-          <p className="text-sm text-muted">Connect Phantom to deposit or withdraw.</p>
-          <button type="button" onClick={() => void connect()} className="mt-4 rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Connect Phantom</button>
-        </div>
+        <EmptyGuide
+          title="Funds stay in your Hyperliquid account"
+          body="SOL leaves this Phantom and arrives as USDC. Withdrawals come back to the same Phantom as SOL. Nothing moves until you confirm it."
+          steps={[
+            "Connect Phantom. The login message does not send SOL.",
+            "Enter how much SOL to send. You will see the fee and what you receive before you confirm.",
+            "After USDC lands, join a trader. Copied trades use this balance.",
+          ]}
+          action={<button type="button" onClick={() => void connect()} className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Connect Phantom</button>}
+        />
       ) : null}
       {(!ready || (session && !live && !message)) ? <Hold /> : null}
       {live ? (
@@ -187,8 +194,8 @@ export default function FundsPage() {
           ) : null}
         </div>
       ) : null}
-      <h2 className="mt-8 font-display text-xl font-bold">Activity</h2>
-      {session && !activity.length ? <p className="mt-3 text-sm text-muted">Deposits and withdrawals will show up here.</p> : null}
+      {session ? <h2 className="mt-8 font-display text-xl font-bold">Activity</h2> : null}
+      {session && !activity.length ? <p className="mt-3 text-sm text-muted">Deposits and withdrawals show up here, with the fee and whether the USDC has landed.</p> : null}
       <ul className="mt-3 space-y-2">
         {activity.map((row) => (
           <li key={row.id} className="rounded-card border border-line px-4 py-3 text-sm">
