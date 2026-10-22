@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { BubbleField } from "@/components/brand/Bubbles"
 import { Avatar } from "@/components/traders/Avatar"
 import { ApiDown } from "@/components/brand/Skeleton"
@@ -26,9 +26,7 @@ const Orbit = ({
   return (
     <div className="mx-auto w-full max-w-[240px]">
       <div ref={orbitRef} className="relative mx-auto aspect-square w-full max-w-[220px] overflow-hidden">
-        <div className={showBubbles ? "opacity-100" : "opacity-0"}>
-          <BubbleField />
-        </div>
+        {showBubbles ? <BubbleField /> : null}
         <div className="absolute left-1/2 top-1/2 z-10 flex h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-white px-2 text-center text-ink">
           {trader ? (
             <>
@@ -88,12 +86,15 @@ export const HomeBoard = ({
   const [tape, setTape] = useState<TapePrint[] | null>(null)
   const [error, setError] = useState("")
   const [attempt, setAttempt] = useState(0)
+  const held = useRef<{ traders: Trader[]; tape: TapePrint[] }>({ traders: [], tape: [] })
 
   useEffect(() => {
     let stop = false
     const cached = readBoard()
-    if (cached) {
-      setTraders(withNames(cached))
+    if (cached?.length) {
+      const named = withNames(cached)
+      held.current.traders = named
+      setTraders(named)
       onReady()
     }
     const load = async () => {
@@ -101,12 +102,14 @@ export const HomeBoard = ({
         const data = await api.traders()
         if (stop) return
         const named = withNames(data.traders)
+        if (held.current.traders.length > 8 && named.length < held.current.traders.length * 0.6) return
+        held.current.traders = named
         writeBoard(named)
         setTraders(named)
         setError("")
         onReady()
       } catch (err) {
-        if (stop) return
+        if (stop || held.current.traders.length) return
         setError(err instanceof Error ? err.message : "Could not reach joined.fun")
         onReady()
       }
@@ -114,9 +117,12 @@ export const HomeBoard = ({
     const loadTape = async () => {
       try {
         const data = await api.tape()
-        if (!stop) setTape(data.tape)
+        if (stop) return
+        if (!data.tape.length && held.current.tape.length) return
+        held.current.tape = data.tape
+        setTape(data.tape)
       } catch {
-        if (!stop) setTape((current) => current ?? [])
+        return
       }
     }
     void load()
@@ -124,7 +130,7 @@ export const HomeBoard = ({
     const timer = window.setInterval(() => {
       void load()
       void loadTape()
-    }, 8000)
+    }, 15000)
     return () => {
       stop = true
       window.clearInterval(timer)

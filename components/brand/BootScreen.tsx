@@ -5,7 +5,6 @@ import { BUBBLES } from "@/components/brand/Bubbles"
 
 const WANDER_MS = 1700
 const GATHER_MS = 1600
-const DEPART_MS = 1200
 
 const easeOut = (value: number) => 1 - (1 - value) ** 4
 
@@ -16,17 +15,6 @@ const wanderAt = (index: number, time: number) => {
   return {
     left: 50 + Math.cos(angle + (time / 900) * speed) * amp,
     top: 46 + Math.sin(angle * 1.2 + (time / 1100) * speed) * amp * 0.82,
-  }
-}
-
-const ringAt = (index: number, width: number, height: number) => {
-  const bubble = BUBBLES[index]
-  const reach = Math.min(width, height) * 0.2
-  const radiusX = (reach / width) * 100
-  const radiusY = (reach / height) * 100
-  return {
-    left: 50 + ((bubble.left - 50) / 42) * radiusX,
-    top: 50 + ((bubble.top - 50) / 42) * radiusY,
   }
 }
 
@@ -61,16 +49,32 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
     const gatherStart = reduce ? 0 : WANDER_MS
     const gatherEnd = reduce ? 240 : WANDER_MS + GATHER_MS
 
-    const place = (index: number, left: number, top: number, scale: number) => {
+    const place = (index: number, x: number, y: number, scale: number) => {
       const node = dots.current[index]
       if (!node) return
-      node.style.left = `${left}%`
-      node.style.top = `${top}%`
+      node.style.position = "fixed"
+      node.style.left = `${x}px`
+      node.style.top = `${y}px`
       node.style.transform = `translate(-50%, -50%) scale(${scale})`
     }
 
-    const beginDepart = () => {
-      const target = orbitRef.current?.getBoundingClientRect()
+    const orbitBox = () => {
+      const node = orbitRef.current
+      if (!node) return null
+      const box = node.getBoundingClientRect()
+      if (box.width < 20 || box.height < 20) return null
+      return box
+    }
+
+    const slot = (index: number, box: DOMRect) => {
+      const bubble = BUBBLES[index]
+      return {
+        x: box.left + (bubble.left / 100) * box.width,
+        y: box.top + (bubble.top / 100) * box.height,
+      }
+    }
+
+    const fadeCover = () => {
       onDepartRef.current()
       if (root.current) root.current.style.pointerEvents = "none"
       if (veil.current) veil.current.style.opacity = "0"
@@ -82,42 +86,11 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
         word.current.style.transition = "opacity 400ms ease"
         word.current.style.opacity = "0"
       }
-      if (!target || target.width < 20) {
-        window.setTimeout(() => onDoneRef.current(), reduce ? 200 : DEPART_MS)
-        return
-      }
+    }
 
-      for (let index = 0; index < BUBBLES.length; index += 1) {
-        const node = dots.current[index]
-        const bubble = BUBBLES[index]
-        if (!node) continue
-        const box = node.getBoundingClientRect()
-        const currentX = box.left + box.width / 2
-        const currentY = box.top + box.height / 2
-        const nextX = target.left + (bubble.left / 100) * target.width
-        const nextY = target.top + (bubble.top / 100) * target.height
-        const delay = (index % 8) * 16
-        node.style.transition = "none"
-        node.style.position = "fixed"
-        node.style.left = `${currentX}px`
-        node.style.top = `${currentY}px`
-        node.style.transform = "translate(-50%, -50%) scale(1)"
-        node.dataset.delay = String(delay)
-        node.dataset.nextX = String(nextX)
-        node.dataset.nextY = String(nextY)
-      }
-      void dots.current[0]?.offsetWidth
-      window.requestAnimationFrame(() => {
-        for (let index = 0; index < BUBBLES.length; index += 1) {
-          const node = dots.current[index]
-          if (!node) continue
-          const delay = node.dataset.delay ?? "0"
-          node.style.transition = `left ${DEPART_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, top ${DEPART_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`
-          node.style.left = `${node.dataset.nextX}px`
-          node.style.top = `${node.dataset.nextY}px`
-        }
-      })
-      window.setTimeout(() => onDoneRef.current(), DEPART_MS + 180)
+    const beginDepart = () => {
+      fadeCover()
+      window.setTimeout(() => onDoneRef.current(), reduce ? 200 : 680)
     }
 
     const paint = (now: number) => {
@@ -125,25 +98,24 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
       const time = now - started
       const width = window.innerWidth
       const height = window.innerHeight
+      const box = orbitBox()
+      const gathering = time > gatherStart && Boolean(box)
 
       for (let index = 0; index < BUBBLES.length; index += 1) {
         const wander = wanderAt(index, Math.min(time, gatherStart))
-        if (time <= gatherStart) {
+        const fromX = (wander.left / 100) * width
+        const fromY = (wander.top / 100) * height
+        if (!gathering || !box) {
           const scale = 0.85 + Math.sin(time / 380 + index) * 0.12
-          place(index, wander.left, wander.top, scale)
+          place(index, fromX, fromY, scale)
           continue
         }
-        const ring = ringAt(index, width, height)
+        const next = slot(index, box)
         const progress = easeOut(Math.min(1, (time - gatherStart) / (gatherEnd - gatherStart)))
-        const spin = time > gatherEnd ? (time - gatherEnd) / 16000 : 0
-        const dx = ring.left - 50
-        const dy = ring.top - 50
-        const turnedLeft = 50 + dx * Math.cos(spin) - dy * Math.sin(spin)
-        const turnedTop = 50 + dx * Math.sin(spin) + dy * Math.cos(spin)
         place(
           index,
-          wander.left + (turnedLeft - wander.left) * progress,
-          wander.top + (turnedTop - wander.top) * progress,
+          fromX + (next.x - fromX) * progress,
+          fromY + (next.y - fromY) * progress,
           0.7 + 0.3 * progress,
         )
       }
@@ -156,9 +128,9 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
       if (word.current) word.current.style.opacity = String(formed)
 
       const elapsed = now - started
-      const gathered = elapsed >= gatherEnd
+      const gathered = Boolean(orbitBox()) && elapsed >= gatherEnd
       const waitedLongEnough = elapsed > gatherEnd + 2200
-      if (gathered && !departed.current && (canDepartRef.current || waitedLongEnough)) {
+      if (!departed.current && ((gathered && canDepartRef.current) || waitedLongEnough)) {
         finished = true
         departed.current = true
         beginDepart()
@@ -170,9 +142,9 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
     const release = () => {
       if (departed.current || finished) return
       const elapsed = performance.now() - started
-      const gathered = elapsed >= gatherEnd
+      const gathered = Boolean(orbitBox()) && elapsed >= gatherEnd
       const waitedLongEnough = elapsed > gatherEnd + 2200
-      if (!gathered || (!canDepartRef.current && !waitedLongEnough)) return
+      if (!(gathered && canDepartRef.current) && !waitedLongEnough) return
       finished = true
       departed.current = true
       beginDepart()

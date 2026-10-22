@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useLayoutEffect, useMemo, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { ApiDown, Skeleton } from "@/components/brand/Skeleton"
 import { TickerLink } from "@/components/markets/TickerLink"
 import { Avatar } from "@/components/traders/Avatar"
@@ -78,10 +78,15 @@ export default function TradersPage() {
   const [fetchedAt, setFetchedAt] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [attempt, setAttempt] = useState(0)
+  const held = useRef<Trader[]>([])
 
   useLayoutEffect(() => {
     const cached = readBoard()
-    if (cached) setTraders(withNames(cached))
+    if (cached?.length) {
+      const named = withNames(cached)
+      held.current = named
+      setTraders(named)
+    }
   }, [])
 
   useEffect(() => {
@@ -96,13 +101,18 @@ export default function TradersPage() {
         const data = await api.traders()
         if (!stop) {
           const named = withNames(data.traders)
+          if (held.current.length > 8 && named.length < held.current.length * 0.6) {
+            setFetchedAt(Date.now())
+            return
+          }
+          held.current = named
           writeBoard(named)
           setTraders(named)
           setFetchedAt(Date.now())
           setError("")
         }
       } catch (err) {
-        if (!stop) setError(err instanceof Error ? err.message : "Could not reach joined.fun")
+        if (!stop && !held.current.length) setError(err instanceof Error ? err.message : "Could not reach joined.fun")
       }
     }
     void load()
