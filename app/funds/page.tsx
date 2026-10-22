@@ -6,7 +6,7 @@ import { useSession } from "@/app/providers"
 import { Hold } from "@/components/brand/Hold"
 import { api, type ActivityRow, type FundPreview, type LiveAccount, type WithdrawProgress } from "@/lib/api"
 import { shortAddr, usd } from "@/lib/format"
-import { getPhantom, phantomError } from "@/lib/phantom"
+import { getPhantom, phantomError, signatureText, waitForPhantom } from "@/lib/phantom"
 
 export default function FundsPage() {
   const { session, ready, connect } = useSession()
@@ -63,12 +63,19 @@ export default function FundsPage() {
     setMessage("Opening the swap. Phantom will ask you to send the SOL.")
     try {
       const created = await api.liveDepositOpen(sol)
-      const provider = getPhantom()
+      const provider = (await waitForPhantom()) ?? getPhantom()
       if (!provider) throw new Error("Reconnect Phantom to send SOL.")
       setMessage("Confirm the SOL send in Phantom.")
       const bytes = Uint8Array.from(atob(created.tx), (char) => char.charCodeAt(0))
-      const sent = await provider.signAndSendTransaction(VersionedTransaction.deserialize(bytes))
-      const txHash = typeof sent === "string" ? sent : sent.signature
+      let transaction: VersionedTransaction
+      try {
+        transaction = VersionedTransaction.deserialize(bytes)
+      } catch {
+        throw new Error("Could not prepare the SOL transfer.")
+      }
+      const sent = await provider.signAndSendTransaction(transaction)
+      const txHash = signatureText(sent)
+      if (txHash.length < 32) throw new Error("Phantom did not return the transaction.")
       await api.liveDepositSent(created.id, txHash)
       setMessage("SOL is on the way. USDC is usually ready in a few seconds.")
       for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -79,7 +86,7 @@ export default function FundsPage() {
       }
       await refresh()
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : phantomError(err))
+      setMessage(phantomError(err))
     } finally {
       setBusy(false)
     }
@@ -93,7 +100,7 @@ export default function FundsPage() {
       setMessage(result.message || (result.returned ? "Funds are on the way back to Phantom." : "Nothing to return yet."))
       await refresh()
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : phantomError(err))
+      setMessage(phantomError(err))
     } finally {
       setBusy(false)
     }
@@ -113,7 +120,7 @@ export default function FundsPage() {
       setMessage(sent.message)
       await refresh()
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : phantomError(err))
+      setMessage(phantomError(err))
     } finally {
       setBusy(false)
     }

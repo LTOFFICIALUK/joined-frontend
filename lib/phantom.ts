@@ -93,6 +93,75 @@ export const readSignature = (signed: { signature?: ArrayLike<number> } | ArrayL
   return signed as ArrayLike<number>
 }
 
+const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+const encodeBase58 = (bytes: Uint8Array) => {
+  if (!bytes.length) return ""
+  const digits = [0]
+  for (const byte of bytes) {
+    let carry = byte
+    for (let index = 0; index < digits.length; index += 1) {
+      carry += (digits[index] ?? 0) << 8
+      digits[index] = carry % 58
+      carry = Math.floor(carry / 58)
+    }
+    while (carry > 0) {
+      digits.push(carry % 58)
+      carry = Math.floor(carry / 58)
+    }
+  }
+  let zeros = 0
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros += 1
+  return "1".repeat(zeros) + digits.reverse().map((digit) => BASE58[digit] ?? "").join("")
+}
+
+export const signatureText = (sent: { signature?: string | ArrayLike<number> } | string | null | undefined) => {
+  if (typeof sent === "string") return sent
+  const signature = sent?.signature
+  if (typeof signature === "string") return signature
+  if (signature && typeof signature === "object") {
+    return encodeBase58(signature instanceof Uint8Array ? signature : Uint8Array.from(Array.from(signature)))
+  }
+  return ""
+}
+
+export const rejectedByPhantom = (err: unknown) => {
+  if (!err || typeof err !== "object") return false
+  const record = err as { code?: number; message?: string }
+  const code = Number(record.code ?? 0)
+  const message = String(record.message ?? "")
+  return code === 4001 || /reject|denied|cancel/i.test(message)
+}
+
+export const connectPhantom = async (provider: PhantomSolana) => {
+  const read = () => pubkeyOf(provider.publicKey)
+  try {
+    const connected = await provider.connect()
+    const pubkey = pubkeyOf(connected?.publicKey) || read()
+    if (pubkey) return pubkey
+  } catch (err) {
+    const existing = read()
+    if (existing && !rejectedByPhantom(err)) return existing
+    if (rejectedByPhantom(err)) throw err
+    await provider.disconnect().catch(() => undefined)
+    const connected = await provider.connect()
+    const pubkey = pubkeyOf(connected?.publicKey) || read()
+    if (pubkey) return pubkey
+    throw err
+  }
+  throw new Error("Phantom did not return a public key")
+}
+
+export const signPhantom = async (provider: PhantomSolana, message: string) => {
+  const bytes = new TextEncoder().encode(message)
+  try {
+    return await provider.signMessage(bytes, "utf8")
+  } catch (err) {
+    if (rejectedByPhantom(err)) throw err
+    return provider.signMessage(bytes)
+  }
+}
+
 export const isEthereumUnavailable = (error?: unknown) => {
   if (!getPhantomEthereum()) return true
   if (error === undefined) return false
@@ -107,6 +176,12 @@ export const phantomError = (err: unknown) => {
   const code = Number(record.code ?? 0)
   const message = [record.message, record.data?.message].filter(Boolean).join(" ")
   if (code === 4001 || /reject|denied|cancel/i.test(message)) return "Request rejected in Phantom"
+  if (code === -32002 || /already (open|pending)|resource not available/i.test(message)) {
+    return "Phantom is already asking for approval. Finish that prompt, then try again."
+  }
+  if (code === -32603 || /unexpected error/i.test(message)) {
+    return "Unlock Phantom, then try connecting again."
+  }
   if (/unsupported account|doesn.?t support|trying to use ethereum/i.test(message)) {
     return "This Phantom account is Solana only. Hyperliquid live mode needs an Ethereum address."
   }

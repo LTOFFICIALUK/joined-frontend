@@ -1,8 +1,8 @@
 "use client"
 
-import { createContext, useContext, useLayoutEffect, useMemo, useState } from "react"
+import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { api, clearToken, getToken, setToken, toB64 } from "@/lib/api"
-import { getPhantom, phantomError, pubkeyOf, readSignature, waitForPhantom } from "@/lib/phantom"
+import { connectPhantom, getPhantom, phantomError, readSignature, rejectedByPhantom, signPhantom, waitForPhantom, type PhantomSolana } from "@/lib/phantom"
 import { useStream } from "@/lib/stream"
 
 type Session = { pubkey: string; evm: string }
@@ -30,6 +30,7 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState("")
+  const flight = useRef<Promise<boolean> | null>(null)
 
   useLayoutEffect(() => {
     const token = getToken()
@@ -53,38 +54,51 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
       setSession(null)
       setHint("")
     },
-    connect: async () => {
-      setBusy(true)
-      setHint("Opening Phantom")
-      try {
-        const provider = (await waitForPhantom()) ?? getPhantom()
-        if (!provider) {
-          setHint("Phantom is not installed")
+    connect: () => {
+      if (flight.current) return flight.current
+      const run = (async () => {
+        setBusy(true)
+        setHint("Opening Phantom")
+        try {
+          const provider = (await waitForPhantom()) ?? getPhantom()
+          if (!provider) {
+            setHint("Phantom is not installed")
+            return false
+          }
+          let pubkey = await connectPhantom(provider)
+          setHint("Sign the login message")
+          let issued = await api.nonce(pubkey)
+          let signed: Awaited<ReturnType<PhantomSolana["signMessage"]>>
+          try {
+            signed = await signPhantom(provider, issued.message)
+          } catch (err) {
+            if (rejectedByPhantom(err)) throw err
+            await provider.disconnect().catch(() => undefined)
+            pubkey = await connectPhantom(provider)
+            issued = await api.nonce(pubkey)
+            signed = await signPhantom(provider, issued.message)
+          }
+          const { token, user } = await api.verify({
+            pubkey,
+            nonce: issued.nonce,
+            signature: toB64(readSignature(signed)),
+          })
+          setToken(token)
+          setSession({ pubkey: user.phantomPubkey, evm: user.evmAddress ?? "" })
+          setHint("")
+          return true
+        } catch (err) {
+          setHint(phantomError(err))
           return false
+        } finally {
+          setBusy(false)
         }
-        const connected = provider.isConnected && provider.publicKey
-          ? { publicKey: provider.publicKey }
-          : await provider.connect()
-        const pubkey = pubkeyOf(connected.publicKey)
-        if (!pubkey) throw new Error("Phantom did not return a public key")
-        setHint("Sign the login message")
-        const { nonce, message } = await api.nonce(pubkey)
-        const signed = await provider.signMessage(new TextEncoder().encode(message), "utf8")
-        const { token, user } = await api.verify({
-          pubkey,
-          nonce,
-          signature: toB64(readSignature(signed)),
-        })
-        setToken(token)
-        setSession({ pubkey: user.phantomPubkey, evm: user.evmAddress ?? "" })
-        setHint("")
-        return true
-      } catch (err) {
-        setHint(phantomError(err))
-        return false
-      } finally {
-        setBusy(false)
-      }
+      })()
+      flight.current = run
+      void run.finally(() => {
+        if (flight.current === run) flight.current = null
+      })
+      return run
     },
   }), [busy, hint, session, ready])
 

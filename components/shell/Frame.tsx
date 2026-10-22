@@ -81,7 +81,7 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
         <Footer />
       </div>
       {open && !session ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center" role="presentation" onClick={() => { if (!busy) setOpen(false) }}>
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-4 sm:items-center" role="presentation" onClick={() => { if (!busy) setOpen(false) }}>
           <div
             role="dialog"
             aria-modal="true"
