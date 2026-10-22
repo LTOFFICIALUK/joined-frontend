@@ -232,11 +232,12 @@ export const tradeMove = (dir: string, side: "long" | "short") => {
 }
 
 export const holdLabel = (ms: number) => {
-  const minutes = Math.round(ms / 60000)
-  if (minutes < 90) return `${Math.max(1, minutes)} minutes`
+  const minutes = Math.max(1, Math.round(ms / 60000))
+  if (minutes < 90) return minutes === 1 ? "1 minute" : `${minutes} minutes`
   const hours = Math.round(minutes / 60)
-  if (hours < 36) return `${hours} hours`
-  return `${Math.round(hours / 24)} days`
+  if (hours < 36) return hours === 1 ? "1 hour" : `${hours} hours`
+  const days = Math.round(hours / 24)
+  return days === 1 ? "1 day" : `${days} days`
 }
 
 export const fillRead = (fills: TraderFill[]) => {
