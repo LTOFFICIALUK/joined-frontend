@@ -184,6 +184,11 @@ export default function FundsPage() {
               <span className="text-muted">{row.status}</span>
             </div>
             <p className="mt-1 text-xs text-muted">{row.message || (row.amountUsd ? `$${usd(row.amountUsd)}` : "Pending")}</p>
+            {row.txHash ? (
+              <a className="mt-1 inline-block font-mono text-xs text-teal" href={row.txHash.startsWith("0x") ? `https://arbiscan.io/tx/${row.txHash}` : `https://solscan.io/tx/${row.txHash}`} target="_blank" rel="noreferrer">
+                {shortAddr(row.txHash)}
+              </a>
+            ) : null}
           </li>
         ))}
       </ul>

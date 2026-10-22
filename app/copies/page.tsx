@@ -6,7 +6,7 @@ import { useSession } from "@/app/providers"
 import { Hold } from "@/components/brand/Hold"
 import { EmptyGuide } from "@/components/shell/EmptyGuide"
 import { api, type JoinRow } from "@/lib/api"
-import { shortAddr, signedUsd, sz, usd } from "@/lib/format"
+import { compactUsd, shortAddr, signedUsd, sz, usd } from "@/lib/format"
 import { useEmbedded } from "@/lib/embed"
 
 const actionWord = (value: string) => {
@@ -17,20 +17,16 @@ const actionWord = (value: string) => {
   return "Updated"
 }
 
-const actionLine = (action: JoinRow["actions"][number]) => {
-  const name = action.coin.split(":").pop() || action.coin
-  const word = actionWord(action.traderAction)
-  if (action.status === "placed") return `${word} ${name}.`
-  if (action.status === "skipped") return `${word} ${name}. Waiting until the copy reaches $10.`
-  return `${word} ${name}. ${action.detail}`
-}
-
 export default function CopiesPage() {
   const embedded = useEmbedded()
   const { session, ready, connect } = useSession()
   const [rows, setRows] = useState<JoinRow[] | null>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState("")
+  const [account, setAccount] = useState("")
+  const [ask, setAsk] = useState<{ id: string; kind: "pause" | "resume" | "size" | "cap" | "stop" | "close" } | null>(null)
+  const [sizeDraft, setSizeDraft] = useState<Record<string, string>>({})
+  const [capDraft, setCapDraft] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!ready) return
@@ -45,6 +41,8 @@ export default function CopiesPage() {
         if (!stop) {
           setRows(data.joins)
           setError("")
+          const live = await api.live().catch(() => null)
+          if (!stop && live) setAccount(live.address)
         }
       } catch (err) {
         if (!stop) setError(err instanceof Error ? err.message : "Could not reach joined.fun")
@@ -58,28 +56,39 @@ export default function CopiesPage() {
     }
   }, [ready, session])
 
-  const handleStop = async (id: string) => {
-    setBusy(id)
+  const handleConfirm = async () => {
+    if (!ask) return
+    const row = (rows ?? []).find((item) => item.id === ask.id)
+    if (!row) return
+    setBusy(row.id)
     try {
-      await api.stopJoin(id)
-      setRows((current) => (current ?? []).filter((row) => row.id !== id))
+      if (ask.kind === "pause") await api.pauseJoin(row.id)
+      if (ask.kind === "resume") await api.resumeJoin(row.id)
+      if (ask.kind === "size") await api.updateJoin(row.id, { sizeUsd: Number(sizeDraft[row.id] || row.sizeUsd) })
+      if (ask.kind === "cap") {
+        const next = capDraft[row.id] ?? ""
+        await api.updateJoin(row.id, { maxLeverage: next === "" || next === "0" ? null : Number(next) })
+      }
+      if (ask.kind === "stop") await api.stopJoin(row.id)
+      if (ask.kind === "close") await api.closeJoin(row.id)
+      const data = await api.joins()
+      setRows(data.joins)
+      setAsk(null)
+      setError("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not stop")
+      setError(err instanceof Error ? err.message : "Could not update the copy")
     } finally {
       setBusy("")
     }
   }
 
-  const handleClose = async (id: string) => {
-    setBusy(id)
-    try {
-      await api.closeJoin(id)
-      setRows((current) => (current ?? []).filter((row) => row.id !== id))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not close")
-    } finally {
-      setBusy("")
-    }
+  const confirmLine = (kind: NonNullable<typeof ask>["kind"]) => {
+    if (kind === "pause") return "Pause copying. Open positions stay. New trades wait until you resume."
+    if (kind === "resume") return "Resume copying from the next stock trade."
+    if (kind === "size") return "Change the size used for the next copy."
+    if (kind === "cap") return "Change the highest leverage a copy will use."
+    if (kind === "stop") return "Stop copying and keep the open positions."
+    return "Stop copying and close every copied position."
   }
 
   return (
@@ -118,18 +127,45 @@ export default function CopiesPage() {
         />
       ) : null}
       <div className="mt-6 space-y-4">
-        {rows?.map((row) => (
+        {rows?.map((row) => {
+          const copyPnl = row.positions.reduce((sum, position) => sum + position.unrealizedPnl, 0)
+          return (
           <article key={row.id} className="rounded-card border border-line p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <Link href={`/traders/${row.trader}`} className="font-mono text-sm">{shortAddr(row.trader)}</Link>
-                <p className="mt-1 text-xs text-muted">Size ${usd(row.sizeUsd)}{row.maxLeverage ? `, cap ${row.maxLeverage}x` : ""}{row.traderPnl7d === null ? "" : `, trader 7 day ${signedUsd(row.traderPnl7d)}`}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={busy === row.id} onClick={() => void handleStop(row.id)} className="rounded-full border border-line px-3 py-2 font-display text-xs font-bold">Stop</button>
-                <button type="button" disabled={busy === row.id} onClick={() => void handleClose(row.id)} className="rounded-full bg-teal px-3 py-2 font-display text-xs font-bold text-ink">Stop and close</button>
+              <div className="min-w-0">
+                <Link href={`/traders/${row.trader}`} className="font-display text-sm font-bold">{row.traderNickname || shortAddr(row.trader)}</Link>
+                <p className="mt-1 text-xs text-muted">Size {compactUsd(row.sizeUsd)}{row.maxLeverage ? `, cap ${row.maxLeverage}x` : ""}{row.status === "paused" ? ", paused" : ""}</p>
+                <p className="mt-1 text-sm">{row.positions.length ? <>Copy P&amp;L <span className={copyPnl >= 0 ? "text-teal" : "text-down"}>{signedUsd(copyPnl)}</span></> : "The first copy lands here"}</p>
               </div>
             </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => setAsk({ id: row.id, kind: row.status === "paused" ? "resume" : "pause" })} className="rounded-full border border-line px-3 py-2 font-display text-xs font-bold">{row.status === "paused" ? "Resume" : "Pause"}</button>
+              <button type="button" onClick={() => setAsk({ id: row.id, kind: "stop" })} className="rounded-full border border-line px-3 py-2 font-display text-xs font-bold">Stop and keep positions</button>
+              <button type="button" onClick={() => setAsk({ id: row.id, kind: "close" })} className="rounded-full bg-teal px-3 py-2 font-display text-xs font-bold text-ink">Stop and close all</button>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="text-xs text-muted">
+                New size
+                <input value={sizeDraft[row.id] ?? ""} onChange={(event) => setSizeDraft((current) => ({ ...current, [row.id]: event.target.value }))} inputMode="decimal" placeholder={usd(row.sizeUsd)} className="mt-1 w-full rounded-card border border-line bg-black px-3 py-2 text-sm text-paper" />
+              </label>
+              <label className="text-xs text-muted">
+                New cap
+                <input value={capDraft[row.id] ?? ""} onChange={(event) => setCapDraft((current) => ({ ...current, [row.id]: event.target.value }))} inputMode="numeric" placeholder={row.maxLeverage ? `${row.maxLeverage}x` : "Max"} className="mt-1 w-full rounded-card border border-line bg-black px-3 py-2 text-sm text-paper" />
+              </label>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" onClick={() => setAsk({ id: row.id, kind: "size" })} className="font-display text-xs font-bold text-teal">Change size</button>
+              <button type="button" onClick={() => setAsk({ id: row.id, kind: "cap" })} className="font-display text-xs font-bold text-teal">Change cap</button>
+            </div>
+            {ask?.id === row.id ? (
+              <div className="mt-3 rounded-card border border-line p-3">
+                <p className="text-sm">{confirmLine(ask.kind)}</p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" disabled={busy === row.id} onClick={() => void handleConfirm()} className="rounded-full bg-teal px-3 py-2 font-display text-xs font-bold text-ink">Confirm</button>
+                  <button type="button" onClick={() => setAsk(null)} className="rounded-full border border-line px-3 py-2 font-display text-xs font-bold">Cancel</button>
+                </div>
+              </div>
+            ) : null}
             {row.positions.length ? (
               <ul className="mt-4 space-y-2">
                 {row.positions.map((position) => (
@@ -139,22 +175,31 @@ export default function CopiesPage() {
                       {" "}{position.label}
                     </span>
                     <span className={`font-display font-bold ${position.unrealizedPnl >= 0 ? "text-teal" : "text-down"}`}>{signedUsd(position.unrealizedPnl)}</span>
-                    <span className="font-mono text-xs text-muted">{sz(position.size)}, {position.leverage}x</span>
+                    <span className="text-xs text-muted">{sz(position.size)} · {position.leverage}x</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 text-sm text-muted">Copied positions show up here after this trader opens, adds, reduces, or closes a stock perp.</p>
+              <p className="mt-4 text-sm text-muted">The first copy lands here.</p>
             )}
             {row.actions.length ? (
-              <ul className="mt-3 space-y-1">
+              <ul className="mt-3 space-y-2">
                 {row.actions.map((action) => (
-                  <li key={action.id} className="text-sm text-muted">{actionLine(action)}</li>
+                  <li key={action.id} className="text-sm text-muted">
+                    {action.ourAction === "fail" || action.status === "fail" || action.status === "failed" ? (
+                      <span>Trader {actionWord(action.traderAction).toLowerCase()} {action.coin.split(":").pop()}. {action.detail}</span>
+                    ) : (
+                      <span>Trader {actionWord(action.traderAction).toLowerCase()} {action.coin.split(":").pop()}. We {actionWord(action.ourAction).toLowerCase()}.</span>
+                    )}
+                    {action.status === "skipped" ? <span> Waiting until the copy reaches $10.</span> : null}
+                    {account ? <a className="ml-2 font-mono text-xs text-teal" href={`https://app.hyperliquid.xyz/explorer/address/${account}`} target="_blank" rel="noreferrer">Hyperliquid</a> : null}
+                  </li>
                 ))}
               </ul>
             ) : null}
           </article>
-        ))}
+          )
+        })}
       </div>
     </section>
   )

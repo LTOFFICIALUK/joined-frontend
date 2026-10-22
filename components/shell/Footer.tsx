@@ -1,7 +1,16 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { BRAND } from "@/lib/config"
+
+const pages = [
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/markets", label: "Markets" },
+  { href: "/live", label: "Live" },
+  { href: "/stats", label: "Stats" },
+  { href: "/terms", label: "Terms" },
+]
 
 export const Footer = () => {
   const [copied, setCopied] = useState(false)
@@ -26,6 +35,13 @@ export const Footer = () => {
           )}
           <a href={BRAND.url} className="text-sm text-muted">{BRAND.domain}</a>
         </div>
+        <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Footer">
+          {pages.map((page) => (
+            <Link key={page.href} href={page.href} className="text-sm text-muted">
+              {page.label}
+            </Link>
+          ))}
+        </nav>
         <div className="min-w-0 sm:max-w-md sm:text-right">
           <div className="flex items-center gap-3 sm:justify-end">
             <span className="font-display text-sm font-extrabold">{BRAND.ticker}</span>

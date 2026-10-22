@@ -1,12 +1,14 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useSession } from "@/app/providers"
 import { api, getToken, type FundPreview, type LiveAccount, type Trader } from "@/lib/api"
 import { depositSol } from "@/lib/deposit"
 import { usd } from "@/lib/format"
 import { phantomError } from "@/lib/phantom"
-import { followLine } from "@/lib/traderStyle"
+import { BRAND } from "@/lib/config"
+import { followLine, nicknameFor } from "@/lib/traderStyle"
 
 const presets = [100, 250, 500, 1000]
 const caps = [
@@ -26,6 +28,7 @@ export const JoinFlow = ({ trader, formId = "join", compact = false }: { trader:
   const [preview, setPreview] = useState<FundPreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState("")
+  const [joined, setJoined] = useState(false)
   const [editing, setEditing] = useState(!compact)
 
   const sized = custom.trim() ? Number(custom) : preset
@@ -90,7 +93,8 @@ export const JoinFlow = ({ trader, formId = "join", compact = false }: { trader:
         return
       }
       await api.join({ trader: trader.address, sizeUsd: size, maxLeverage: leverageCap })
-      setNote("You are copying this trader. New stock trades will follow from here.")
+      setJoined(true)
+      setNote("")
     } catch (err) {
       setNote(phantomError(err))
     } finally {
@@ -105,6 +109,22 @@ export const JoinFlow = ({ trader, formId = "join", compact = false }: { trader:
       : short
         ? "Send SOL"
         : "Confirm join"
+
+  if (joined) {
+    const nickname = nicknameFor(trader)
+    const text = `I joined ${nickname} on joined.fun`
+    const href = `https://x.com/intent/tweet?text=${encodeURIComponent(`${text} ${BRAND.url}/traders/${trader.address}`)}`
+    return (
+      <div>
+        <h2 className="font-display text-xl font-bold">You joined</h2>
+        <p className="mt-2 text-sm">{text}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href={href} target="_blank" rel="noreferrer" className="rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Share on X</a>
+          <Link href="/portfolio" className="rounded-full border border-line px-4 py-2 font-display text-sm font-bold">Portfolio</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -174,6 +194,7 @@ export const JoinFlow = ({ trader, formId = "join", compact = false }: { trader:
         </div>
       ) : null}
       {!session ? <p className="mt-3 text-xs text-muted">Phantom asks you to sign a login message. It does not send funds.</p> : null}
+      <p className="mt-3 text-xs text-muted">joined does not charge a copy fee. Hyperliquid charges its own trading fee on each order. Sending SOL shows Relay&apos;s bridge fee before you confirm.</p>
       <button
         type="button"
         onClick={() => void handleJoin()}

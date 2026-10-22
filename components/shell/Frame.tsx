@@ -10,6 +10,8 @@ import { Footer } from "@/components/shell/Footer"
 
 const links = [
   { href: "/traders", label: "Traders" },
+  { href: "/markets", label: "Markets" },
+  { href: "/live", label: "Live" },
   { href: "/portfolio", label: "Portfolio" },
 ]
 

@@ -30,6 +30,14 @@ const PRETTY: Record<string, string> = {
   TSM: "TSMC",
   NFLX: "Netflix",
   AVGO: "Broadcom",
+  MU: "Micron",
+  SNDK: "SanDisk",
+  SKHX: "SK Hynix",
+  SKHY: "SK Hynix",
+  DRAM: "DRAM",
+  KIOXIA: "Kioxia",
+  WDC: "Western Digital",
+  CRCL: "Circle",
   SP500: "Index",
   XYZ100: "Index",
   SPCX: "Space",
@@ -89,21 +97,54 @@ export const riskOf = (trader: Pick<Trader, "accountValue" | "positions">): Risk
   return "Low"
 }
 
-export const nicknameFor = (trader: Pick<Trader, "positions">) => {
-  const positions = trader.positions
-  if (!positions.length) return "Trader"
+const prettyName = (label: string) => PRETTY[label.toUpperCase()] ?? label
+
+const nameOptions = (trader: Pick<Trader, "positions" | "accountValue">) => {
+  const positions = [...trader.positions].sort((a, b) => b.positionValue - a.positionValue)
+  const lead = positions[0]
+  if (!lead) return ["Quiet Book"]
+  const name = prettyName(lead.label)
+  const bear = lead.side === "short"
+  const side = bear ? "Bear" : "Bull"
+  const dir = bear ? "Short" : "Long"
+  const second = positions.find((position) => position.label !== lead.label)
+  const third = positions.find((position) => position.label !== lead.label && position.label !== second?.label)
+  const secondName = second ? prettyName(second.label) : ""
+  const thirdName = third ? prettyName(third.label) : ""
+  const lev = Math.max(1, Math.round(lead.leverage || 1))
   const gross = positions.reduce((sum, position) => sum + position.positionValue, 0) || 1
   const chips = positions.filter((position) => CHIPS.has(position.label.toUpperCase()))
   const chipNotional = chips.reduce((sum, position) => sum + position.positionValue, 0)
-  if (chips.length && chipNotional / gross >= 0.35) {
-    const shortNotional = chips.filter((position) => position.side === "short").reduce((sum, position) => sum + position.positionValue, 0)
-    return shortNotional * 2 >= chipNotional ? "Memory Chip Bear" : "Memory Chip Bull"
-  }
-  const lead = leadPosition(trader)
-  if (!lead) return "Trader"
-  if (CHIPS.has(lead.label.toUpperCase())) return lead.side === "short" ? "Memory Chip Bear" : "Memory Chip Bull"
-  const pretty = PRETTY[lead.label.toUpperCase()] ?? lead.label
-  return lead.side === "short" ? `${pretty} Shorter` : `${pretty} Longer`
+  const chipHeavy = chips.length > 0 && chipNotional / gross >= 0.35
+  const chipShort = chips.filter((position) => position.side === "short").reduce((sum, position) => sum + position.positionValue, 0) * 2 >= chipNotional
+  const exposure = trader.accountValue > 0 ? lead.positionValue / trader.accountValue : 0
+  const names: string[] = []
+  if (chipHeavy) names.push(chipShort ? "Memory Chip Bear" : "Memory Chip Bull")
+  names.push(`${name} ${side}`)
+  if (lev <= 3) names.push(`Patient ${name} ${dir}`)
+  if (lev >= 8) names.push(`${lev}x ${name} ${side}`)
+  if (second && second.side !== lead.side && secondName) names.push(`${chipHeavy ? "Chip" : name} ${side}, ${secondName} Hedge`)
+  if (secondName && secondName !== name) names.push(`${name} and ${secondName} ${side}`)
+  if (secondName && thirdName) names.push(`${name} ${dir}, ${secondName} and ${thirdName}`)
+  if (positions.length >= 12) names.push(`Wide ${name} ${side}`)
+  if (positions.length <= 2) names.push(`Focused ${name} ${dir}`)
+  if (exposure >= 3) names.push(`Heavy ${name} ${side}`)
+  if (exposure > 0 && exposure < 0.35) names.push(`Light ${name} ${dir}`)
+  return [...new Set(names)]
+}
+
+export const nicknameFor = (trader: Pick<Trader, "positions" | "accountValue" | "nickname">) =>
+  trader.nickname || nameOptions(trader)[0] || "Trader"
+
+export const withNames = (traders: Trader[]) => {
+  if (traders.every((trader) => trader.nickname)) return traders
+  const used = new Set(traders.flatMap((trader) => (trader.nickname ? [trader.nickname] : [])))
+  return traders.map((trader) => {
+    if (trader.nickname) return trader
+    const nickname = nameOptions(trader).find((name) => !used.has(name)) || nameOptions(trader)[0] || "Trader"
+    used.add(nickname)
+    return { ...trader, nickname }
+  })
 }
 
 export const spokenAsset = (label: string) => SPOKEN[label.toUpperCase()] ?? label
@@ -133,6 +174,7 @@ export const maxLeverageOf = (trader: Pick<Trader, "positions">) =>
 export type Print = {
   key: string
   address?: string
+  nickname?: string
   label: string
   side: "long" | "short"
   size: number
@@ -142,22 +184,25 @@ export type Print = {
 
 const asMs = (time: number) => (time > 0 && time < 1e12 ? time * 1000 : time)
 
-export const groupPrints = (fills: Array<Pick<TraderFill, "label" | "side" | "size" | "price" | "time"> & { address?: string }>): Print[] => {
+export const groupPrints = (fills: Array<Pick<TraderFill, "label" | "side" | "size" | "price" | "time"> & { address?: string; nickname?: string }>): Print[] => {
   const ordered = [...fills].sort((a, b) => asMs(b.time) - asMs(a.time))
   const groups: Print[] = []
   for (const fill of ordered) {
     if (!(fill.size > 0) || !(fill.price > 0)) continue
     const current = groups[groups.length - 1]
-    const closeInTime = current && Math.abs(asMs(current.time) - asMs(fill.time)) <= 90_000
+    const samePrice = current && Math.abs(current.price - fill.price) <= Math.max(0.01, current.price * 0.0005)
+    const closeInTime = current && Math.abs(asMs(current.time) - asMs(fill.time)) <= 3_000
     const sameTrade = current
       && current.label === fill.label
       && current.side === fill.side
       && current.address === fill.address
+      && samePrice
       && closeInTime
     if (!current || !sameTrade) {
       groups.push({
         key: `${fill.address ?? ""}-${fill.label}-${fill.time}-${fill.side}`,
         address: fill.address,
+        nickname: fill.nickname,
         label: fill.label,
         side: fill.side,
         size: fill.size,
@@ -174,11 +219,69 @@ export const groupPrints = (fills: Array<Pick<TraderFill, "label" | "side" | "si
   return groups
 }
 
-export const printLine = (print: Pick<Print, "side" | "size" | "label" | "price">) => {
+export const tradeMove = (dir: string, side: "long" | "short") => {
+  const text = dir.trim().toLowerCase()
+  if (text.startsWith("open")) return "Opened"
+  if (text.startsWith("close") || text.includes("liquidat")) return "Closed"
+  if (text.startsWith("add")) return "Added"
+  if (text.includes("reduce") || text.includes("cut")) return "Cut"
+  if (text.includes(">")) return "Flipped"
+  if (text === "buy") return "Bought"
+  if (text === "sell") return "Sold"
+  return side === "long" ? "Bought" : "Sold"
+}
+
+export const holdLabel = (ms: number) => {
+  const minutes = Math.round(ms / 60000)
+  if (minutes < 90) return `${Math.max(1, minutes)} minutes`
+  const hours = Math.round(minutes / 60)
+  if (hours < 36) return `${hours} hours`
+  return `${Math.round(hours / 24)} days`
+}
+
+export const fillRead = (fills: TraderFill[]) => {
+  const times = fills.map((fill) => asMs(fill.time)).filter((time) => time > 0)
+  const oldest = times.length ? Math.min(...times) : 0
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const inWeek = fills.filter((fill) => asMs(fill.time) >= weekAgo).length
+  const complete = fills.length < 30 || (oldest > 0 && oldest < weekAgo)
+  const ordered = [...fills].sort((a, b) => asMs(a.time) - asMs(b.time))
+  const openAt = new Map<string, number[]>()
+  const holds: number[] = []
+  for (const fill of ordered) {
+    const stack = openAt.get(fill.label) ?? []
+    if (/^open/i.test(fill.dir)) stack.push(asMs(fill.time))
+    else if (/close|liquidat/i.test(fill.dir) && stack.length) {
+      const start = stack.pop() ?? 0
+      if (start > 0) holds.push(asMs(fill.time) - start)
+    }
+    openAt.set(fill.label, stack)
+  }
+  const closes = fills.filter((fill) => /close|liquidat/i.test(fill.dir))
+  const wins = closes.filter((fill) => fill.pnl > 0).length
+  return {
+    tradesPerWeek: complete ? inWeek : null,
+    averageHold: holds.length ? holds.reduce((sum, value) => sum + value, 0) / holds.length : null,
+    closeWinRate: closes.length >= 4 ? wins / closes.length : null,
+  }
+}
+
+export const averageLeverage = (positions: TraderPosition[]) => {
+  const notional = positions.reduce((sum, position) => sum + position.positionValue, 0)
+  if (!(notional > 0)) return null
+  return positions.reduce((sum, position) => sum + position.leverage * position.positionValue, 0) / notional
+}
+
+export const printBits = (print: Pick<Print, "side" | "size" | "price">) => {
   const verb = print.side === "long" ? "Bought" : "Sold"
   const size = print.size >= 100 ? print.size.toFixed(0) : print.size >= 1 ? print.size.toFixed(1) : print.size.toFixed(2)
   const price = print.price >= 1000 ? print.price.toLocaleString("en-US", { maximumFractionDigits: 0 }) : print.price.toLocaleString("en-US", { maximumFractionDigits: 2 })
-  return `${verb} ${size} ${print.label} at $${price}`
+  return { verb, size, price }
+}
+
+export const printLine = (print: Pick<Print, "side" | "size" | "label" | "price">) => {
+  const bits = printBits(print)
+  return `${bits.verb} ${bits.size} ${print.label} at $${bits.price}`
 }
 
 export const avatarDots = (address: string) => {

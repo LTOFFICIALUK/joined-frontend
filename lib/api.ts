@@ -131,6 +131,9 @@ export type TraderPosition = {
   leverage: number
   positionValue: number
   unrealizedPnl: number
+  entryPx?: number
+  liquidation?: number | null
+  markPx?: number
 }
 
 export type Trader = {
@@ -142,11 +145,15 @@ export type Trader = {
   roi7d: number
   roi30d: number
   positions: TraderPosition[]
+  pnl7Series?: PnlPoint[]
   pnl30Series: PnlPoint[]
+  pnlAllSeries?: PnlPoint[]
+  pnlAll?: number | null
   joined: number
   winRate?: number
   maxDrop?: number
   score?: number
+  nickname?: string
 }
 
 export type TraderFill = {
@@ -165,6 +172,8 @@ export type TraderFill = {
 export type JoinRow = {
   id: string
   trader: string
+  traderNickname?: string | null
+  status?: string
   sizeUsd: number
   createdAt: string
   traderPnl7d: number | null
@@ -232,11 +241,57 @@ export type WithdrawProgress = {
 
 export type TapePrint = {
   address: string
+  nickname?: string
   label: string
   side: "long" | "short"
   size: number
   price: number
   time: number
+  dir?: string
+  leverage?: number | null
+}
+
+export type BoardMarket = {
+  label: string
+  longUsd: number
+  shortUsd: number
+  longWallets: number
+  shortWallets: number
+  biggestUsd: number
+  biggestSide: "long" | "short"
+}
+
+export type MarketHolder = {
+  address: string
+  nickname: string
+  side: "long" | "short"
+  sizeUsd: number
+  leverage: number
+}
+
+export type Joiners = {
+  count: number
+  copiedUsd: number
+  wallets: string[]
+}
+
+export type SiteStats = {
+  walletsJoined: number
+  copiedUsd: number
+  copiedTrades: number
+  depositsUsd: number
+  recent: Array<{
+    id: string
+    trader: string
+    coin: string
+    detail: string
+    traderAction: string
+    ourAction: string
+    ourSize: number
+    side: string
+    evmAddress: string | null
+    createdAt: string
+  }>
 }
 
 export type ActivityRow = {
@@ -246,6 +301,7 @@ export type ActivityRow = {
   amountUsd: number
   sol: number
   message: string
+  txHash?: string
   createdAt: string
 }
 
@@ -262,9 +318,23 @@ export const api = {
   tape: () => request<{ tape: TapePrint[]; asOf: number }>("/traders/tape"),
   trader: (address: string) =>
     request<{ trader: Trader; fills: TraderFill[]; asOf: number }>(`/traders/${address}`),
+  joiners: (address: string) => request<{ joiners: Joiners }>(`/traders/${address}/joiners`),
+  boardMarkets: () => request<{ markets: BoardMarket[]; asOf: number }>("/traders/markets"),
+  boardMarket: (ticker: string) =>
+    request<{ market: BoardMarket & { holders: MarketHolder[]; prints: TapePrint[] }; asOf: number }>(`/traders/markets/${encodeURIComponent(ticker)}`),
+  stats: () => request<{ stats: SiteStats; asOf: number }>("/traders/stats"),
   joins: () => request<{ joins: JoinRow[] }>("/joins"),
   join: (body: { trader: string; sizeUsd: number; maxLeverage?: number | null }) =>
     request<{ id: string; trader: string; sizeUsd: number; maxLeverage: number | null; status: string }>("/joins", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  pauseJoin: (id: string) =>
+    request<{ id: string; status: string }>(`/joins/${id}/pause`, { method: "POST", body: "{}" }),
+  resumeJoin: (id: string) =>
+    request<{ id: string; status: string }>(`/joins/${id}/resume`, { method: "POST", body: "{}" }),
+  updateJoin: (id: string, body: { sizeUsd?: number; maxLeverage?: number | null }) =>
+    request<{ id: string; sizeUsd: number; maxLeverage: number | null; status: string }>(`/joins/${id}/update`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

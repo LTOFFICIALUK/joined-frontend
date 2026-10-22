@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { useEffect, useLayoutEffect, useMemo, useState } from "react"
-import { Hold } from "@/components/brand/Hold"
+import { ApiDown, Skeleton } from "@/components/brand/Skeleton"
+import { TickerLink } from "@/components/markets/TickerLink"
 import { Avatar } from "@/components/traders/Avatar"
 import { PnlLine } from "@/components/traders/PnlLine"
 import { api, type Trader } from "@/lib/api"
 import { readBoard, writeBoard } from "@/lib/boardCache"
 import { compactUsd, signedUsd, usd } from "@/lib/format"
-import { copyScore, leadPosition, marketNote, maxLeverageOf, monthStats, nicknameFor, positionBrief, riskOf } from "@/lib/traderStyle"
+import { copyScore, leadPosition, marketNote, maxLeverageOf, monthStats, nicknameFor, riskOf, withNames } from "@/lib/traderStyle"
 
 type SortKey = "score" | "pnl30d" | "pnl7d" | "accountValue"
 type SideKey = "all" | "long" | "short"
@@ -76,10 +77,11 @@ export default function TradersPage() {
   const [open, setOpen] = useState("")
   const [fetchedAt, setFetchedAt] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [attempt, setAttempt] = useState(0)
 
   useLayoutEffect(() => {
     const cached = readBoard()
-    if (cached) setTraders(cached)
+    if (cached) setTraders(withNames(cached))
   }, [])
 
   useEffect(() => {
@@ -93,8 +95,9 @@ export default function TradersPage() {
       try {
         const data = await api.traders()
         if (!stop) {
-          writeBoard(data.traders)
-          setTraders(data.traders)
+          const named = withNames(data.traders)
+          writeBoard(named)
+          setTraders(named)
           setFetchedAt(Date.now())
           setError("")
         }
@@ -108,7 +111,7 @@ export default function TradersPage() {
       stop = true
       window.clearInterval(timer)
     }
-  }, [])
+  }, [attempt])
 
   const stocks = useMemo(() => {
     const counts = new Map<string, number>()
@@ -147,10 +150,6 @@ export default function TradersPage() {
     setMinAccount(0)
   }
 
-  const handleStock = (label: string) => {
-    setQuery((current) => (current.trim().toUpperCase() === label ? "" : label))
-  }
-
   const handleToggle = (address: string) => {
     setOpen((current) => (current === address ? "" : address))
   }
@@ -171,11 +170,11 @@ export default function TradersPage() {
         </div>
       </div>
       <p className="mt-3 text-xs text-muted">{marketNote(new Date(now))}</p>
-      {error ? <p className="mt-6 text-sm text-down">{error}</p> : null}
+      {error ? <div className="mt-6"><ApiDown message={error} onRetry={() => setAttempt((value) => value + 1)} /></div> : null}
       {traders && !traders.length && !error ? (
         <p className="mt-8 rounded-card border border-line p-6 text-sm leading-relaxed text-muted">No open stock positions on the leaderboard right now. When a top wallet has an open Hyperliquid stock perp, it shows up here with 30 day P&L and a Join button.</p>
       ) : null}
-      {traders === null && !error ? <Hold /> : null}
+      {traders === null && !error ? <div className="mt-6 space-y-3"><Skeleton /><Skeleton /><Skeleton /></div> : null}
       {traders && traders.length ? (
         <div className="mt-6">
           <div className="flex flex-wrap items-center gap-2">
@@ -215,7 +214,9 @@ export default function TradersPage() {
           />
           <div className="mt-3 flex flex-wrap gap-2" aria-label="Popular stocks">
             {stocks.map((label) => (
-              <Chip key={label} pressed={query.trim().toUpperCase() === label} label={label} onClick={() => handleStock(label)} />
+              <Link key={label} href={`/markets/${label}`} className="rounded-full border border-line px-3 py-1.5 font-display text-xs font-bold text-teal">
+                {label}
+              </Link>
             ))}
           </div>
           <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted">
@@ -259,7 +260,7 @@ export default function TradersPage() {
                     <span className="mt-1 flex items-center justify-between gap-3 text-xs">
                       <span className="truncate">
                         <span className={`font-display font-bold ${riskClass(risk)}`}>{risk}</span>
-                        {lead ? <span className="text-muted"> · {positionBrief(lead)}</span> : null}
+                        {lead ? <span className="text-muted"> · {compactUsd(lead.positionValue)} {lead.side} {lead.label} · {lead.leverage}x</span> : null}
                       </span>
                       <span className="text-[11px] text-muted">#{index + 1}</span>
                     </span>
@@ -286,7 +287,7 @@ export default function TradersPage() {
                   <p className="mt-2 text-xs text-muted">{trader.joined > 0 ? `${trader.joined} joined` : "Be the first to join"}</p>
                   <ul className="mt-3 space-y-1">
                     {trader.positions.slice(0, 5).map((position) => (
-                      <li key={position.coin} className="text-sm text-muted">{positionBrief(position)}</li>
+                      <li key={position.coin} className="text-sm text-muted">{compactUsd(position.positionValue)} {position.side} <TickerLink label={position.label} /> · {position.leverage}x</li>
                     ))}
                     {trader.positions.length > 5 ? <li className="text-xs text-muted">{trader.positions.length - 5} more positions</li> : null}
                   </ul>
