@@ -5,6 +5,7 @@ import { BUBBLES } from "@/components/brand/Bubbles"
 
 const WANDER_MS = 1700
 const GATHER_MS = 1600
+const DEPART_MS = 1100
 
 const easeOut = (value: number) => 1 - (1 - value) ** 4
 
@@ -15,6 +16,17 @@ const wanderAt = (index: number, time: number) => {
   return {
     left: 50 + Math.cos(angle + (time / 900) * speed) * amp,
     top: 46 + Math.sin(angle * 1.2 + (time / 1100) * speed) * amp * 0.82,
+  }
+}
+
+const ringAt = (index: number, width: number, height: number) => {
+  const bubble = BUBBLES[index]
+  const reach = Math.min(width, height) * 0.2
+  const radiusX = (reach / width) * 100
+  const radiusY = (reach / height) * 100
+  return {
+    left: 50 + ((bubble.left - 50) / 42) * radiusX,
+    top: 50 + ((bubble.top - 50) / 42) * radiusY,
   }
 }
 
@@ -48,6 +60,10 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
     let finished = false
     const gatherStart = reduce ? 0 : WANDER_MS
     const gatherEnd = reduce ? 240 : WANDER_MS + GATHER_MS
+    const departMs = reduce ? 200 : DEPART_MS
+    let mode: "show" | "fly" = "show"
+    let flyStart = 0
+    const flyFrom: Array<{ x: number; y: number }> = []
 
     const place = (index: number, x: number, y: number, scale: number) => {
       const node = dots.current[index]
@@ -88,36 +104,80 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
       }
     }
 
-    const beginDepart = () => {
+    const stageSize = () => {
+      const box = root.current?.getBoundingClientRect()
+      return {
+        width: box?.width || window.innerWidth,
+        height: box?.height || window.innerHeight,
+      }
+    }
+
+    const centerPose = (index: number, time: number, width: number, height: number) => {
+      const wander = wanderAt(index, Math.min(time, gatherStart))
+      const fromX = (wander.left / 100) * width
+      const fromY = (wander.top / 100) * height
+      if (time <= gatherStart) {
+        return { x: fromX, y: fromY, scale: 0.85 + Math.sin(time / 380 + index) * 0.12 }
+      }
+      const ring = ringAt(index, width, height)
+      const progress = easeOut(Math.min(1, (time - gatherStart) / (gatherEnd - gatherStart)))
+      const spin = time > gatherEnd ? (time - gatherEnd) / 16000 : 0
+      const dx = ring.left - 50
+      const dy = ring.top - 50
+      const turnedLeft = 50 + dx * Math.cos(spin) - dy * Math.sin(spin)
+      const turnedTop = 50 + dx * Math.sin(spin) + dy * Math.cos(spin)
+      const left = wander.left + (turnedLeft - wander.left) * progress
+      const top = wander.top + (turnedTop - wander.top) * progress
+      return {
+        x: (left / 100) * width,
+        y: (top / 100) * height,
+        scale: 0.7 + 0.3 * progress,
+      }
+    }
+
+    const startFly = (now: number) => {
+      const time = now - started
+      const { width, height } = stageSize()
+      for (let index = 0; index < BUBBLES.length; index += 1) {
+        const pose = centerPose(index, time, width, height)
+        flyFrom[index] = { x: pose.x, y: pose.y }
+      }
+      mode = "fly"
+      flyStart = now
       fadeCover()
-      window.setTimeout(() => onDoneRef.current(), reduce ? 200 : 680)
     }
 
     const paint = (now: number) => {
       if (finished) return
       const time = now - started
-      const width = window.innerWidth
-      const height = window.innerHeight
-      const box = orbitBox()
-      const gathering = time > gatherStart && Boolean(box)
+      const { width, height } = stageSize()
+
+      if (mode === "fly") {
+        const progress = easeOut(Math.min(1, (now - flyStart) / departMs))
+        const box = orbitBox()
+        for (let index = 0; index < BUBBLES.length; index += 1) {
+          const from = flyFrom[index] ?? { x: width / 2, y: height / 2 }
+          const next = box ? slot(index, box) : from
+          place(index, from.x + (next.x - from.x) * progress, from.y + (next.y - from.y) * progress, 1)
+        }
+        if (progress < 1) {
+          frame = window.requestAnimationFrame(paint)
+          return
+        }
+        if (box) {
+          for (let index = 0; index < BUBBLES.length; index += 1) {
+            const next = slot(index, box)
+            place(index, next.x, next.y, 1)
+          }
+        }
+        finished = true
+        onDoneRef.current()
+        return
+      }
 
       for (let index = 0; index < BUBBLES.length; index += 1) {
-        const wander = wanderAt(index, Math.min(time, gatherStart))
-        const fromX = (wander.left / 100) * width
-        const fromY = (wander.top / 100) * height
-        if (!gathering || !box) {
-          const scale = 0.85 + Math.sin(time / 380 + index) * 0.12
-          place(index, fromX, fromY, scale)
-          continue
-        }
-        const next = slot(index, box)
-        const progress = easeOut(Math.min(1, (time - gatherStart) / (gatherEnd - gatherStart)))
-        place(
-          index,
-          fromX + (next.x - fromX) * progress,
-          fromY + (next.y - fromY) * progress,
-          0.7 + 0.3 * progress,
-        )
+        const pose = centerPose(index, time, width, height)
+        place(index, pose.x, pose.y, pose.scale)
       }
 
       const formed = Math.min(1, Math.max(0, (time - gatherStart) / Math.max(1, gatherEnd - gatherStart)))
@@ -127,14 +187,11 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
       }
       if (word.current) word.current.style.opacity = String(formed)
 
-      const elapsed = now - started
-      const gathered = Boolean(orbitBox()) && elapsed >= gatherEnd
-      const waitedLongEnough = elapsed > gatherEnd + 2200
+      const gathered = time >= gatherEnd
+      const waitedLongEnough = time > gatherEnd + 2200
       if (!departed.current && ((gathered && canDepartRef.current) || waitedLongEnough)) {
-        finished = true
         departed.current = true
-        beginDepart()
-        return
+        startFly(now)
       }
       frame = window.requestAnimationFrame(paint)
     }
@@ -142,12 +199,12 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
     const release = () => {
       if (departed.current || finished) return
       const elapsed = performance.now() - started
-      const gathered = Boolean(orbitBox()) && elapsed >= gatherEnd
+      const gathered = elapsed >= gatherEnd
       const waitedLongEnough = elapsed > gatherEnd + 2200
       if (!(gathered && canDepartRef.current) && !waitedLongEnough) return
-      finished = true
       departed.current = true
-      beginDepart()
+      startFly(performance.now())
+      frame = window.requestAnimationFrame(paint)
     }
 
     frame = window.requestAnimationFrame(paint)
