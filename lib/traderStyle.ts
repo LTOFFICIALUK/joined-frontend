@@ -189,16 +189,16 @@ export const groupPrints = (fills: Array<Pick<TraderFill, "label" | "side" | "si
   const groups: Print[] = []
   for (const fill of ordered) {
     if (!(fill.size > 0) || !(fill.price > 0)) continue
-    const current = groups[groups.length - 1]
-    const samePrice = current && Math.abs(current.price - fill.price) <= Math.max(0.01, current.price * 0.0005)
-    const closeInTime = current && Math.abs(asMs(current.time) - asMs(fill.time)) <= 3_000
-    const sameTrade = current
-      && current.label === fill.label
-      && current.side === fill.side
-      && current.address === fill.address
-      && samePrice
-      && closeInTime
-    if (!current || !sameTrade) {
+    const current = groups.find((group) => {
+      const samePrice = Math.abs(group.price - fill.price) <= Math.max(0.01, group.price * 0.0005)
+      const closeInTime = Math.abs(asMs(group.time) - asMs(fill.time)) <= 3_000
+      return group.label === fill.label
+        && group.side === fill.side
+        && group.address === fill.address
+        && samePrice
+        && closeInTime
+    })
+    if (!current) {
       groups.push({
         key: `${fill.address ?? ""}-${fill.label}-${fill.time}-${fill.side}`,
         address: fill.address,

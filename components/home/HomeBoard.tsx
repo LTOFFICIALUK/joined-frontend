@@ -41,9 +41,11 @@ const Orbit = ({
           )}
         </div>
       </div>
-      <p className="mt-3 text-center text-xs text-muted">
-        {decorative ? "Be the first to join" : `${count} joined`}
-      </p>
+      {count < 0 ? null : (
+        <p className="mt-3 text-center text-xs text-muted">
+          {decorative ? "Be the first to join" : `${count} joined`}
+        </p>
+      )}
     </div>
   )
 }
@@ -83,7 +85,7 @@ export const HomeBoard = ({
   onReady: () => void
 }) => {
   const [traders, setTraders] = useState<Trader[] | null>(null)
-  const [tape, setTape] = useState<TapePrint[]>([])
+  const [tape, setTape] = useState<TapePrint[] | null>(null)
   const [error, setError] = useState("")
   const [attempt, setAttempt] = useState(0)
 
@@ -114,7 +116,7 @@ export const HomeBoard = ({
         const data = await api.tape()
         if (!stop) setTape(data.tape)
       } catch {
-        if (!stop) setTape([])
+        if (!stop) setTape((current) => current ?? [])
       }
     }
     void load()
@@ -131,7 +133,7 @@ export const HomeBoard = ({
 
   const top = traders?.[0] ?? null
   const cards = traders?.slice(0, 4) ?? []
-  const prints = groupPrints(tape).slice(0, 6)
+  const prints = groupPrints(tape ?? []).slice(0, 6)
   const nameFor = (address: string) => {
     const found = traders?.find((trader) => trader.address.toLowerCase() === address.toLowerCase())
     return found ? nicknameFor(found) : shortAddr(address)
@@ -143,7 +145,7 @@ export const HomeBoard = ({
       {traders && !traders.length && !error ? (
         <p className="mb-6 text-sm text-muted">No open stock positions on the leaderboard right now. Traders with open Hyperliquid stock perps will show up here.</p>
       ) : null}
-      <Orbit trader={top} count={top?.joined ?? 0} orbitRef={orbitRef} showBubbles={showBubbles} />
+      <Orbit trader={top} count={traders ? (top?.joined ?? 0) : -1} orbitRef={orbitRef} showBubbles={showBubbles} />
       <Link href="/live" className="mt-8 flex items-center gap-2 font-display text-sm font-bold">
         <span className="h-2 w-2 animate-pulse rounded-full bg-teal" aria-hidden="true" />
         Live trades from the top wallets
@@ -163,9 +165,9 @@ export const HomeBoard = ({
             )
           })}
         </ul>
-      ) : (
+      ) : tape ? (
         <p className="mt-3 text-sm text-muted">The first trade from these wallets lands here.</p>
-      )}
+      ) : null}
       <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {cards.map((trader, index) => (
           <Card key={trader.address} trader={trader} rank={index + 1} />
