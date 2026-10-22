@@ -188,7 +188,7 @@ export const BootScreen = ({ canDepart, orbit, onDepart, onDone }: BootScreenPro
   }, [])
 
   return (
-    <div ref={root} className="fixed inset-0 z-[80]" role="status" aria-live="polite" aria-label="Loading joined">
+    <div ref={root} className="fixed inset-0 z-[80] overflow-hidden" role="status" aria-live="polite" aria-label="Loading joined">
       <div ref={veil} className="absolute inset-0 bg-black transition-opacity duration-[1200ms] ease-out" />
       {BUBBLES.map((bubble, index) => {
         const start = wanderAt(index, 0)

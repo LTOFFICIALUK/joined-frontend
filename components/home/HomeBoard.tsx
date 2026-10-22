@@ -22,7 +22,7 @@ const Orbit = ({
   const decorative = count < 1
   return (
     <div className="mx-auto w-full max-w-[440px]">
-      <div ref={orbitRef} className="relative mx-auto aspect-square w-full max-w-[420px]">
+      <div ref={orbitRef} className="relative mx-auto aspect-square w-full max-w-[420px] overflow-hidden">
         <div className={showBubbles ? "opacity-100" : "opacity-0"}>
           <BubbleField />
         </div>

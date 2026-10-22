@@ -19,7 +19,8 @@ html, body {
   background: #000;
   color: #f2f2f0;
   overflow-anchor: none;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overscroll-behavior: none;
   scrollbar-gutter: stable;
 }
 

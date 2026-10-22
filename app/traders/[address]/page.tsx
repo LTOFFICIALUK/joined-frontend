@@ -23,6 +23,7 @@ export default function TraderPage() {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState("")
   const [showAllFills, setShowAllFills] = useState(false)
+  const [showAllPositions, setShowAllPositions] = useState(false)
 
   const [fillsReady, setFillsReady] = useState(false)
 
@@ -31,6 +32,7 @@ export default function TraderPage() {
     setFills([])
     setFillsReady(false)
     setShowAllFills(false)
+    setShowAllPositions(false)
     setError("")
   }, [address])
 
@@ -112,19 +114,28 @@ export default function TraderPage() {
           <PnlLine points={trader.pnl30Series} />
         </div>
         <h2 className="mt-8 font-display text-xl font-bold">Open stock positions</h2>
-        <ul className="mt-3 space-y-2">
-          {trader.positions.length ? trader.positions.map((position) => (
-            <li key={position.coin} className="rounded-card border border-line px-4 py-3 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-display font-bold">{position.label}</span>
-                <span className={position.side === "long" ? "text-teal" : "text-down"}>{position.side === "long" ? "Long" : "Short"}</span>
-              </div>
-              <p className="mt-1 font-mono text-xs text-muted">{sz(position.size)} size, {position.leverage}x, ${usd(position.positionValue)}</p>
-            </li>
-          )) : (
-            <li className="text-sm text-muted">No open stock positions right now.</li>
-          )}
-        </ul>
+        {trader.positions.length ? (
+          <>
+            <ul className="mt-3 space-y-2">
+              {(showAllPositions ? trader.positions : trader.positions.slice(0, 5)).map((position) => (
+                <li key={position.coin} className="rounded-card border border-line px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-display font-bold">{position.label}</span>
+                    <span className={position.side === "long" ? "text-teal" : "text-down"}>{position.side === "long" ? "Long" : "Short"}</span>
+                  </div>
+                  <p className="mt-1 font-mono text-xs text-muted">{sz(position.size)} size, {position.leverage}x, ${usd(position.positionValue)}</p>
+                </li>
+              ))}
+            </ul>
+            {trader.positions.length > 5 ? (
+              <button type="button" onClick={() => setShowAllPositions((current) => !current)} className="mt-3 text-sm text-teal">
+                {showAllPositions ? "Show fewer positions" : `Show all ${trader.positions.length} positions`}
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-muted">No open stock positions right now.</p>
+        )}
         <h2 className="mt-8 font-display text-xl font-bold">Recent fills</h2>
         {!fillsReady ? <div className="mt-3 h-16" /> : fills.length ? (
           <>
