@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { shortAddr } from "@/lib/format"
 import { phantomInstallUrl } from "@/lib/phantom"
 import { useSession } from "@/app/providers"
@@ -19,10 +19,21 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname()
   const { session, busy, hint, connect, disconnect } = useSession()
   const [open, setOpen] = useState(false)
+  const [shown, setShown] = useState(true)
+  const path = useRef(pathname)
+
+  useLayoutEffect(() => {
+    if (path.current === pathname) return
+    path.current = pathname
+    window.scrollTo(0, 0)
+    setShown(false)
+    const timer = window.setTimeout(() => setShown(true), 40)
+    return () => window.clearTimeout(timer)
+  }, [pathname])
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-line">
+      <header className="sticky top-0 z-40 border-b border-line bg-black">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4">
           <Link href="/" className="flex items-center gap-2" aria-label="joined home">
             <img src="/brand/joined-mark-white.svg" alt="" className="h-7 w-7" />
@@ -65,8 +76,10 @@ export const Frame = ({ children }: { children: React.ReactNode }) => {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
-      <Footer />
+      <div className={`flex flex-1 flex-col ${shown ? "opacity-100 transition-opacity duration-300 ease-out motion-reduce:transition-none" : "opacity-0"}`}>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+        <Footer />
+      </div>
       {open && !session ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center" role="presentation" onClick={() => { if (!busy) setOpen(false) }}>
           <div

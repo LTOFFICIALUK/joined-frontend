@@ -1,10 +1,12 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useState } from "react"
+import { Hold } from "@/components/brand/Hold"
 import { PnlLine } from "@/components/traders/PnlLine"
 import { useSession } from "@/app/providers"
 import { api, getToken, type Trader, type TraderFill } from "@/lib/api"
+import { traderFromBoard } from "@/lib/boardCache"
 import { px, shortAddr, signedUsd, sz, usd } from "@/lib/format"
 
 const presets = [100, 250, 500, 1000]
@@ -21,6 +23,15 @@ export default function TraderPage() {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState("")
 
+  const [fillsReady, setFillsReady] = useState(false)
+
+  useLayoutEffect(() => {
+    setTrader(traderFromBoard(address))
+    setFills([])
+    setFillsReady(false)
+    setError("")
+  }, [address])
+
   useEffect(() => {
     let stop = false
     const load = async () => {
@@ -29,6 +40,7 @@ export default function TraderPage() {
         if (!stop) {
           setTrader(data.trader)
           setFills(data.fills)
+          setFillsReady(true)
           setError("")
         }
       } catch (err) {
@@ -66,10 +78,17 @@ export default function TraderPage() {
     }
   }
 
+  if (!trader && !error) {
+    return (
+      <section>
+        <Hold />
+      </section>
+    )
+  }
   if (error && !trader) {
     return <p className="text-sm text-down">{error}</p>
   }
-  if (!trader) return <p className="text-sm text-muted">Loading this trader.</p>
+  if (!trader) return null
 
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -105,7 +124,7 @@ export default function TraderPage() {
           )}
         </ul>
         <h2 className="mt-8 font-display text-xl font-bold">Recent fills</h2>
-        {fills.length ? (
+        {!fillsReady ? <div className="mt-3 h-16" /> : fills.length ? (
           <ul className="mt-3 space-y-2">
             {fills.map((fill) => (
               <li key={`${fill.id}-${fill.time}`} className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-line px-4 py-3 text-sm">
@@ -118,7 +137,7 @@ export default function TraderPage() {
           <p className="mt-3 text-sm text-muted">Recent stock fills will show up here.</p>
         )}
       </div>
-      <aside className="h-fit rounded-card border border-line p-4 lg:sticky lg:top-4">
+      <aside className="h-fit rounded-card border border-line p-4 lg:sticky lg:top-24">
         <h2 className="font-display text-xl font-bold">Join</h2>
         <p className="mt-2 text-sm text-muted">Your size follows this trader from the next stock trade. Existing positions stay theirs.</p>
         <div className="mt-4 grid grid-cols-2 gap-2">

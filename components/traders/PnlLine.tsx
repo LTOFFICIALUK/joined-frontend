@@ -2,7 +2,7 @@ import type { PnlPoint } from "@/lib/api"
 
 export const PnlLine = ({ points }: { points: PnlPoint[] }) => {
   if (points.length < 2) {
-    return <p className="text-xs leading-relaxed text-muted">30 day P&L line will show when Hyperliquid has history for this wallet.</p>
+    return <p className="flex h-16 items-center text-xs leading-relaxed text-muted">30 day P&L line will show when Hyperliquid has history for this wallet.</p>
   }
   const width = 280
   const height = 72

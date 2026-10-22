@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useSession } from "@/app/providers"
+import { Hold } from "@/components/brand/Hold"
 import { api, type JoinRow } from "@/lib/api"
 import { shortAddr, signedUsd, sz, usd } from "@/lib/format"
 
@@ -89,6 +90,7 @@ export default function CopiesPage() {
         </div>
       ) : null}
       {error ? <p className="mt-6 text-sm text-down">{error}</p> : null}
+      {(!ready || (session && rows === null && !error)) ? <Hold /> : null}
       {session && rows && !rows.length ? (
         <p className="mt-8 rounded-card border border-line p-6 text-sm text-muted">
           No active copies. Pick a trader and your copied stock positions will show up here. <Link href="/traders" className="text-teal">Find a trader</Link>

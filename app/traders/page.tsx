@@ -1,14 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useState } from "react"
+import { Hold } from "@/components/brand/Hold"
 import { PnlLine } from "@/components/traders/PnlLine"
 import { api, type Trader } from "@/lib/api"
+import { readBoard, writeBoard } from "@/lib/boardCache"
 import { shortAddr, signedUsd, sz, usd } from "@/lib/format"
 
 export default function TradersPage() {
   const [traders, setTraders] = useState<Trader[] | null>(null)
   const [error, setError] = useState("")
+
+  useLayoutEffect(() => {
+    const cached = readBoard()
+    if (cached) setTraders(cached)
+  }, [])
 
   useEffect(() => {
     let stop = false
@@ -16,6 +23,7 @@ export default function TradersPage() {
       try {
         const data = await api.traders()
         if (!stop) {
+          writeBoard(data.traders)
           setTraders(data.traders)
           setError("")
         }
@@ -39,7 +47,7 @@ export default function TradersPage() {
           <p className="mt-2 max-w-xl text-sm text-muted">Top Hyperliquid wallets with open stock perps. 7 day and 30 day P&L update live.</p>
         </div>
         <span className="mb-1 inline-flex items-center gap-2 text-xs text-muted">
-          <span className="h-2 w-2 rounded-full bg-teal" />
+          <span className="h-2.5 w-2.5 rounded-full bg-teal shadow-[0_0_12px_rgba(80,210,193,0.9)]" />
           Live
         </span>
       </div>
@@ -47,8 +55,8 @@ export default function TradersPage() {
       {traders && !traders.length && !error ? (
         <p className="mt-8 rounded-card border border-line p-6 text-sm text-muted">No open stock positions on the leaderboard right now. Traders with open Hyperliquid stock perps will show up here.</p>
       ) : null}
-      {traders === null && !error ? <p className="mt-8 text-sm text-muted">Loading the Hyperliquid leaderboard.</p> : null}
-      <div className="mt-6 space-y-3">
+      {traders === null && !error ? <Hold /> : null}
+      <div className={`mt-6 space-y-3 ${traders ? "motion-safe:animate-settle" : ""}`}>
         {traders?.map((trader, index) => (
           <article key={trader.address} className="rounded-card border border-line p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">

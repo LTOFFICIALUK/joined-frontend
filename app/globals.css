@@ -18,6 +18,8 @@ html, body {
   min-height: 100%;
   background: #000;
   color: #f2f2f0;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
 }
 
 body {

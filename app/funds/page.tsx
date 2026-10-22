@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { VersionedTransaction } from "@solana/web3.js"
 import { useSession } from "@/app/providers"
+import { Hold } from "@/components/brand/Hold"
 import { api, type ActivityRow, type FundPreview, type LiveAccount, type WithdrawProgress } from "@/lib/api"
 import { shortAddr, usd } from "@/lib/format"
 import { getPhantom, phantomError } from "@/lib/phantom"
@@ -128,6 +129,7 @@ export default function FundsPage() {
           <button type="button" onClick={() => void connect()} className="mt-4 rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Connect Phantom</button>
         </div>
       ) : null}
+      {(!ready || (session && !live && !message)) ? <Hold /> : null}
       {live ? (
         <div className="mt-6 rounded-card border border-line p-4">
           <p className="font-display text-3xl font-extrabold">${usd(live.equityUsd)}</p>
@@ -141,7 +143,7 @@ export default function FundsPage() {
           ) : null}
         </div>
       ) : null}
-      {session ? (
+      {session && live ? (
         <div className="mt-6 rounded-card border border-line p-4">
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setTab("deposit")} className={`rounded-full py-2 font-display text-sm font-bold ${tab === "deposit" ? "bg-teal text-ink" : "border border-line"}`}>Deposit</button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "@/app/providers"
+import { Hold } from "@/components/brand/Hold"
 import { api, type LiveAccount, type Market } from "@/lib/api"
 import { px, signedUsd, sz, usd } from "@/lib/format"
 
@@ -71,6 +72,7 @@ export default function PositionsPage() {
           <button type="button" onClick={() => void connect()} className="mt-4 rounded-full bg-teal px-4 py-2 font-display text-sm font-bold text-ink">Connect Phantom</button>
         </div>
       ) : null}
+      {(!ready || (session && !live && !error)) ? <Hold /> : null}
       {live ? (
         <p className="mt-4 text-sm text-muted">Equity ${usd(live.equityUsd)}. Withdrawable ${usd(live.withdrawableUsd)}.</p>
       ) : null}

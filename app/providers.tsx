@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useContext, useLayoutEffect, useMemo, useState } from "react"
 import { api, clearToken, getToken, setToken, toB64 } from "@/lib/api"
 import { getPhantom, phantomError, pubkeyOf, readSignature, waitForPhantom } from "@/lib/phantom"
 import { useStream } from "@/lib/stream"
@@ -31,7 +31,7 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState("")
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const token = getToken()
     if (!token) {
       setReady(true)
